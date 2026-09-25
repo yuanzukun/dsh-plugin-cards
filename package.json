@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-cards",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "description": "DeepSeek Harness (dsh) 设置卡片 + 对话节点插件",
   "type": "module",
   "main": "lib/index.js",
@@ -13,7 +13,7 @@
     "./client": "./lib/client.js"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node -e \"require('fs').accessSync('lib/client.js'); console.log('client.js present OK')\"",
     "dev": "tsdown --watch"
   },
   "devDependencies": {

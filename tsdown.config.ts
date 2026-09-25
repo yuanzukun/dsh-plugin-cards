@@ -8,4 +8,7 @@ export default defineConfig({
   outDir: 'lib',
   platform: 'node',
   dts: false,
+  // 关键：lib/client.js 是手写客户端产物（闭包工厂格式，见仓库根该文件头注），
+  // 不在 tsdown entry 内；clean 开着会把它在每次构建时删掉，导致发布的包缺客户端（0.2.0 踩坑）。
+  clean: false,
 })
