@@ -37,7 +37,7 @@ dsh plugin --profile <name> add github:yuanzukun/dsh-plugin   # git 安装（pre
 
 ## 路线
 
-- [x] P0 脚手架 + 加载验证
+- [x] P0 脚手架 + 加载验证（✅ 2026-09-25 于 dsh-v0.1.7-rc.2 源码宿主实测通过：`pnpm dsh web --patch cordis.dev.patch.yml` 输出 `[dsh-plugin-cards] plugin loaded!`）
 - [ ] P1 设置卡片（Schemastery Config + HMR）
 - [ ] P2 对话节点（ConversationNodeDefinition + keyed renderer，session/event 渲染）
 - [ ] P3 npm 发布
