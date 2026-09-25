@@ -4,7 +4,8 @@
  * T1. 四 Tab 存在，默认市场页（filterbar+grid 可见）
  * T2. 已安装 Tab：管理行渲染（停用/更新/卸载），badge 数字 ≥1
  * T3. 自定义安装 Tab：输入框 + 「安装…」按钮（空输入禁用）
- * T4. 设置 Tab：三枚开关（质量过滤/仅可安装/排序）+ 数据源说明
+ * T4. 设置 Tab：两枚开关（质量过滤/仅可安装）+ 数据源说明；排序 chip 已移回市场（0.8.1，设置页无「排序：」）
+ * T4b. 市场工具行：搜索框 + 排序按钮（排序：★ 最多）+ 刷新目录
  * T5. 市场安装弹确认层：安全提示 + 来源 + CLI 命令 + 复制安装命令/直接安装；✕ 关闭后宿主清单不变
  * T6. 自定义安装弹同一确认层（npm 来源链接）
  * R. 回归：快照就绪 + 严格口径无灰置卡
@@ -12,7 +13,7 @@
 const puppeteer = require('C:/Users/54622/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core')
 const fs = require('fs')
 
-const URL = 'http://127.0.0.1:3080/?token=I0fw2oZi3Ql7ktJDCWWoxl5_oPRRLKjfkMDZn-QuR5g'
+const URL = 'http://127.0.0.1:3080/?token=l9CHBD636D1e3vgag4mWG_3P89nPt_3BmZd-xlmozMQ'
 const SNAP_URL = 'http://127.0.0.1:8941/cards-snapshot.json'
 const HOST_PKG = 'D:/ruan/dsh-home-npm/profiles/web/package.json'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -145,16 +146,31 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
   const assertT3 = cust.input && cust.go && cust.goDisabled === true
   console.log('CUSTOM-TAB:', JSON.stringify(cust))
 
-  // T4. 设置 Tab
+  // T4. 设置 Tab（0.8.1：排序 chip 已移回市场，设置页应无「排序：」）
   await clickTab('设置')
   await sleep(800)
   const setq = await page.evaluate(() => {
-    const t = ['质量过滤：开', '仅可安装：开', '排序：★ 最多'].map((n) => !![...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === n))
+    const btn = (n) => !![...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === n)
+    const t = ['质量过滤：开', '仅可安装：开'].map(btn)
+    const sortInSettings = btn('排序：★ 最多') || btn('排序：最近更新')
     const src = document.body.textContent.includes('数据源：GitHub topic:dsh-plugin')
-    return { toggles: t, src }
+    return { toggles: t, sortInSettings, src }
   })
-  const assertT4 = setq.toggles.every(Boolean) && setq.src
+  const assertT4 = setq.toggles.every(Boolean) && !setq.sortInSettings && setq.src
   console.log('SETTINGS-TAB:', JSON.stringify(setq))
+
+  // T4b. 市场工具行（0.8.1：排序 chip 在市场 head）
+  await clickTab('插件市场')
+  await sleep(1500)
+  const toolbar = await page.evaluate(() => {
+    const sort = [...document.querySelectorAll('button')].find((e) => /^排序：(★ 最多|最近更新)$/.test((e.textContent || '').trim()))
+    const refresh = [...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === '刷新目录')
+    const search = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('搜索'))
+    const sortSameRow = sort && refresh && sort.parentElement === refresh.parentElement
+    return { sort: sort ? sort.textContent.trim() : null, refresh: !!refresh, search: !!search, sortSameRow }
+  })
+  const assertT4b = toolbar.sort && toolbar.refresh && toolbar.search && toolbar.sortSameRow
+  console.log('MARKET-TOOLBAR:', JSON.stringify(toolbar))
 
   // T5. 市场安装 → 确认弹窗 → ✕ 关闭（宿主不变）
   const pkgBefore = hostPkgHas('model-proxy') // 任意基线
@@ -234,8 +250,8 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
 
   const realErrors = errors.filter((e) => !/429|ERR_CONNECTION_REFUSED|Failed to fetch|abort|CORS|gitee\.com|ERR_FAILED|ERR_UNSAFE_PORT/.test(e))
   console.log('pageerrors(real):', realErrors.length ? realErrors.slice(0, 5) : 'none')
-  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT5a && assertT5b && assertT6 && realErrors.length === 0
-  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6 }))
+  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT5a && assertT5b && assertT6 && realErrors.length === 0
+  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6 }))
   console.log(ok ? 'ALL-GREEN' : 'FAILED')
   process.exit(ok ? 0 : 1)
 })().catch((e) => { console.error('FATAL', e); process.exit(1) })
