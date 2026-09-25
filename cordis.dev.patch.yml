@@ -1,5 +1,9 @@
 # 本地调试 patch —— 插件行用绝对路径（--patch overlay 专用，勿随包发布）
 # 用法：pnpm dsh web --patch D:/导航/dsh-plugin/cordis.dev.patch.yml
+# config 覆盖用于验证：显式值生效 + 未提供字段走 schema 默认值
 - insert:
     - id: dsh-plugin-cards
       name: 'D:/导航/dsh-plugin/lib/index.js'
+      config:
+        cardTitle: 'Plugin Cards (dev override)'
+        maxRecentEvents: 50
