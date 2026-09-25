@@ -38,7 +38,7 @@ dsh plugin --profile <name> add github:yuanzukun/dsh-plugin   # git 安装（pre
 ## 路线
 
 - [x] P0 脚手架 + 加载验证（✅ 2026-09-25 于 dsh-v0.1.7-rc.2 源码宿主实测通过：`pnpm dsh web --patch cordis.dev.patch.yml` 输出 `[dsh-plugin-cards] plugin loaded!`）
-- [ ] P1 设置卡片（Schemastery Config + HMR）
+- [x] P1 设置卡片（Schemastery Config，schemastery 3.18.4 打包自包含；配置覆盖 + 默认值补全已实测）
 - [ ] P2 对话节点（ConversationNodeDefinition + keyed renderer，session/event 渲染）
 - [ ] P3 npm 发布
 - [ ] P4 入驻 awesome-dsh-plugin + dsh-plugin-hub
