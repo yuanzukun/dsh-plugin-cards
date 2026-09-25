@@ -1,7 +1,7 @@
 node_modules/
-lib/
+lib/*
+!lib/client.js
 *.log
 .DS_Store
 .workbuddy/
-*.tgz
 *.tgz
