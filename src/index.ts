@@ -31,8 +31,8 @@ export const Config: Schema<Config> = Schema.object({
   cardTitle: Schema.string().default('Plugin Cards').description('卡片 / 对话节点标题'),
   maxRecentEvents: Schema.number().min(1).max(200).default(20).description('对话节点最多渲染的最近事件条数'),
   density: Schema.union(['compact', 'detailed'] as const).default('compact').description('展示密度'),
-  catalogUrl: Schema.string().default('https://api.github.com/search/repositories?q=topic:dsh-plugin&sort=stars&order=desc&per_page=100')
-    .description('社区插件目录数据源（GitHub topics API 同构 JSON）'),
+  catalogUrl: Schema.string().default('https://github.com/topics/dsh-plugin')
+    .description('社区插件目录源：GitHub topics 页面地址（自动转 Search API）或 API 端点'),
 })
 
 export function apply(ctx: Context, config: Config) {
