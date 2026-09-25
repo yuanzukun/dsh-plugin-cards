@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-cards",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "DeepSeek Harness (dsh) 设置卡片 + 对话节点插件",
   "type": "module",
   "main": "lib/index.js",
