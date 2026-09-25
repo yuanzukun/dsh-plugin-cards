@@ -40,6 +40,7 @@ dsh plugin --profile <name> add github:yuanzukun/dsh-plugin   # git 安装（pre
 - [x] P0 脚手架 + 加载验证（✅ 2026-09-25 于 dsh-v0.1.7-rc.2 源码宿主实测通过：`pnpm dsh web --patch cordis.dev.patch.yml` 输出 `[dsh-plugin-cards] plugin loaded!`）
 - [x] P1 设置卡片（Schemastery Config，schemastery 3.18.4 打包自包含；配置覆盖 + 默认值补全已实测）
 - [x] P2 对话节点（P2 v1：`cards-annotation` 节点监听 `user/message`，渲染于 chat 目标；客户端产物 `lib/client.js` 为手写闭包工厂格式，修改后跑 `node --check` 校验）
+- [x] P3 打包安装验证（✅ 2026-09-25：`pnpm pack` 出 tarball（13K），隔离 DSH_HOME 下 `dsh plugin --profile web add <tarball>` 安装零告警，无 `--patch` 启动加载成功，客户端 boot graph + combo 产物实测送达。**npm publish 待用户确认后执行**）
 - [ ] P2 扩展：自定义 SessionEvent + 模型可见输入（所见即所记）
-- [ ] P3 npm 发布
+- [ ] P3+ npm publish（命令就绪：`cd D:/导航/dsh-plugin && pnpm publish --access public`）
 - [ ] P4 入驻 awesome-dsh-plugin + dsh-plugin-hub
