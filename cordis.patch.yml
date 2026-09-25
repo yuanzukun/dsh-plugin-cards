@@ -1,0 +1,5 @@
+# 组合包（bundle）patch —— 发布形态：插件行按包名引用
+# profile 通过 dsh plugin add 安装本包后，此层随 dsh.profile.bundles 生效
+- insert:
+    - id: dsh-plugin-cards
+      name: dsh-plugin-cards
