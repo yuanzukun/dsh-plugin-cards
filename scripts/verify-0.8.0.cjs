@@ -5,7 +5,9 @@
  * T2. 已安装 Tab：管理行渲染（停用/更新/卸载），badge 数字 ≥1
  * T3. 自定义安装 Tab：输入框 + 「安装…」按钮（空输入禁用）
  * T4. 设置 Tab：两枚开关（质量过滤/仅可安装）+ 数据源说明；排序 chip 已移回市场（0.8.1，设置页无「排序：」）
- * T4b. 市场工具行：搜索框 + 排序按钮 + 星数 chip（三档循环，≥3★ 时卡片数减少）+ 刷新目录（0.8.2）
+ * T4b. 市场工具行：搜索框 + 排序按钮 + 星数 chip（三档循环，≥3★ 时目录总数下降）+ 刷新目录（0.8.2）
+ * T4c. 新分类 chip：模型与多模态 / 数据与安全（0.8.3）
+ * T7. 实时版本校验：已装 whale-widget 市场卡片「有更新」且 tooltip 含「npm 实时」（0.8.3）
  * T5. 市场安装弹确认层：安全提示 + 来源 + CLI 命令 + 复制安装命令/直接安装；✕ 关闭后宿主清单不变
  * T6. 自定义安装弹同一确认层（npm 来源链接）
  * R. 回归：快照就绪 + 严格口径无灰置卡
@@ -13,7 +15,7 @@
 const puppeteer = require('C:/Users/54622/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core')
 const fs = require('fs')
 
-const URL = 'http://127.0.0.1:3080/?token=o7R-4qfpOjpU5KtWPNjz01TyX_et9vFfPfz0HUNBsZQ'
+const URL = 'http://127.0.0.1:3080/?token=bvd3m4iT6DNhdIIff4wOt8UW_O7bAD_FaR5ndEoN7ro'
 const SNAP_URL = 'http://127.0.0.1:8941/cards-snapshot.json'
 const HOST_PKG = 'D:/ruan/dsh-home-npm/profiles/web/package.json'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -198,6 +200,24 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
   })
   await sleep(800)
 
+  // T4c. 0.8.3 新分类 chip（模型与多模态 / 数据与安全）出现在分类行
+  const newCats = await page.evaluate(() => {
+    const txt = [...document.querySelectorAll('button')].map((e) => (e.textContent || '').trim())
+    return { model: txt.some((t) => t.startsWith('模型与多模态')), data: txt.some((t) => t.startsWith('数据与安全')) }
+  })
+  const assertT4c = newCats.model && newCats.data
+  console.log('NEW-CATEGORY-CHIPS:', JSON.stringify(newCats))
+
+  // T7. 0.8.3 实时版本校验：已装 whale-widget(0.3.11) 的市场卡片应显示「有更新」，tooltip 含「npm 实时」
+  const rt = await page.evaluate(() => {
+    const card = [...document.querySelectorAll('.dcards-card')].find((c) => ((c.querySelector('.dcards-name') || {}).textContent || '').toLowerCase().includes('whale-widget'))
+    if (!card) return { card: false }
+    const btn = [...card.querySelectorAll('button, span')].find((x) => ['有更新', '已安装'].includes((x.textContent || '').trim()))
+    return { card: true, action: btn ? btn.textContent.trim() : null, title: btn ? btn.title || '' : '', realtime: (btn && btn.title || '').includes('npm 实时') }
+  })
+  const assertT7 = rt.card && rt.action === '有更新' && rt.realtime
+  console.log('REALTIME-VER:', JSON.stringify(rt))
+
   // T5. 市场安装 → 确认弹窗 → ✕ 关闭（宿主不变）
   const pkgBefore = hostPkgHas('model-proxy') // 任意基线
   await clickTab('插件市场')
@@ -276,8 +296,8 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
 
   const realErrors = errors.filter((e) => !/429|ERR_CONNECTION_REFUSED|Failed to fetch|abort|CORS|gitee\.com|ERR_FAILED|ERR_UNSAFE_PORT/.test(e))
   console.log('pageerrors(real):', realErrors.length ? realErrors.slice(0, 5) : 'none')
-  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT5a && assertT5b && assertT6 && realErrors.length === 0
-  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6 }))
+  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT4c && assertT5a && assertT5b && assertT6 && assertT7 && realErrors.length === 0
+  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T4c_newCats: assertT4c, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6, T7_realtime: assertT7 }))
   console.log(ok ? 'ALL-GREEN' : 'FAILED')
   process.exit(ok ? 0 : 1)
 })().catch((e) => { console.error('FATAL', e); process.exit(1) })
