@@ -2,6 +2,14 @@
   "name": "dsh-plugin-cards",
   "version": "0.8.3",
   "description": "DeepSeek Harness (dsh) 设置卡片 + 对话节点插件",
+  "license": "MIT",
+  "author": "yuanzukun",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuanzukun/dsh-plugin-cards.git"
+  },
+  "homepage": "https://github.com/yuanzukun/dsh-plugin-cards#readme",
+  "bugs": "https://github.com/yuanzukun/dsh-plugin-cards/issues",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
