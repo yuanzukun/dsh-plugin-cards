@@ -8,6 +8,10 @@
     "lib",
     "cordis.patch.yml"
   ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch"
@@ -26,6 +30,13 @@
     "engine": "dsh >=0.1.7-rc.2",
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
     }
   }
 }
