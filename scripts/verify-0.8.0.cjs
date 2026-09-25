@@ -5,7 +5,7 @@
  * T2. 已安装 Tab：管理行渲染（停用/更新/卸载），badge 数字 ≥1
  * T3. 自定义安装 Tab：输入框 + 「安装…」按钮（空输入禁用）
  * T4. 设置 Tab：两枚开关（质量过滤/仅可安装）+ 数据源说明；排序 chip 已移回市场（0.8.1，设置页无「排序：」）
- * T4b. 市场工具行：搜索框 + 排序按钮（排序：★ 最多）+ 刷新目录
+ * T4b. 市场工具行：搜索框 + 排序按钮 + 星数 chip（三档循环，≥3★ 时卡片数减少）+ 刷新目录（0.8.2）
  * T5. 市场安装弹确认层：安全提示 + 来源 + CLI 命令 + 复制安装命令/直接安装；✕ 关闭后宿主清单不变
  * T6. 自定义安装弹同一确认层（npm 来源链接）
  * R. 回归：快照就绪 + 严格口径无灰置卡
@@ -13,7 +13,7 @@
 const puppeteer = require('C:/Users/54622/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core')
 const fs = require('fs')
 
-const URL = 'http://127.0.0.1:3080/?token=l9CHBD636D1e3vgag4mWG_3P89nPt_3BmZd-xlmozMQ'
+const URL = 'http://127.0.0.1:3080/?token=o7R-4qfpOjpU5KtWPNjz01TyX_et9vFfPfz0HUNBsZQ'
 const SNAP_URL = 'http://127.0.0.1:8941/cards-snapshot.json'
 const HOST_PKG = 'D:/ruan/dsh-home-npm/profiles/web/package.json'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -153,24 +153,50 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
     const btn = (n) => !![...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === n)
     const t = ['质量过滤：开', '仅可安装：开'].map(btn)
     const sortInSettings = btn('排序：★ 最多') || btn('排序：最近更新')
-    const src = document.body.textContent.includes('数据源：GitHub topic:dsh-plugin')
+    const src = document.body.textContent.includes('目录来源：官方社区仓库 github.com/topics/dsh-plugin')
     return { toggles: t, sortInSettings, src }
   })
   const assertT4 = setq.toggles.every(Boolean) && !setq.sortInSettings && setq.src
   console.log('SETTINGS-TAB:', JSON.stringify(setq))
 
-  // T4b. 市场工具行（0.8.1：排序 chip 在市场 head）
+  // T4b. 市场工具行（0.8.1：排序 chip 在市场 head；0.8.2：星数 chip 三档循环）
   await clickTab('插件市场')
   await sleep(1500)
+  const countBefore = await page.evaluate(() => {
+    const inp = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('条中搜索'))
+    const m = /在全部 (\d+) 条中搜索/.exec((inp || {}).placeholder || '')
+    return m ? Number(m[1]) : null
+  })
   const toolbar = await page.evaluate(() => {
     const sort = [...document.querySelectorAll('button')].find((e) => /^排序：(★ 最多|最近更新)$/.test((e.textContent || '').trim()))
     const refresh = [...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === '刷新目录')
-    const search = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('搜索'))
-    const sortSameRow = sort && refresh && sort.parentElement === refresh.parentElement
-    return { sort: sort ? sort.textContent.trim() : null, refresh: !!refresh, search: !!search, sortSameRow }
+    const star = [...document.querySelectorAll('button')].find((e) => /^星数：/.test((e.textContent || '').trim()))
+    const search = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('条中搜索'))
+    const sortSameRow = sort && refresh && sort.parentElement === refresh.parentElement && star && star.parentElement === refresh.parentElement
+    return { sort: sort ? sort.textContent.trim() : null, star: star ? star.textContent.trim() : null, refresh: !!refresh, search: !!search, sortSameRow }
+  })
+  // 点星数 chip → ≥3★ → 目录总数应减少（快照含大量 0 星长尾）
+  await page.evaluate(() => {
+    const star = [...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === '星数：全部')
+    if (star) star.click()
+  })
+  await sleep(1200)
+  const starFiltered = await page.evaluate(() => {
+    const star = [...document.querySelectorAll('button')].find((e) => /^星数：/.test((e.textContent || '').trim()))
+    const inp = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('条中搜索'))
+    const m = /在全部 (\d+) 条中搜索/.exec((inp || {}).placeholder || '')
+    return { label: star ? star.textContent.trim() : null, total: m ? Number(m[1]) : null }
   })
   const assertT4b = toolbar.sort && toolbar.refresh && toolbar.search && toolbar.sortSameRow
-  console.log('MARKET-TOOLBAR:', JSON.stringify(toolbar))
+    && toolbar.star === '星数：全部' && starFiltered.label === '星数：≥3★'
+    && countBefore !== null && starFiltered.total !== null && starFiltered.total < countBefore
+  console.log('MARKET-TOOLBAR:', JSON.stringify({ toolbar, countBefore, starFiltered }))
+  // 复位星数 chip（避免影响 T5 安装弹窗断言）
+  await page.evaluate(() => {
+    const star = [...document.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === '星数：≥3★')
+    if (star) star.click()
+  })
+  await sleep(800)
 
   // T5. 市场安装 → 确认弹窗 → ✕ 关闭（宿主不变）
   const pkgBefore = hostPkgHas('model-proxy') // 任意基线
