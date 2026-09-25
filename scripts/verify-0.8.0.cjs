@@ -208,15 +208,61 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
   const assertT4c = newCats.model && newCats.data
   console.log('NEW-CATEGORY-CHIPS:', JSON.stringify(newCats))
 
-  // T7. 0.8.3 实时版本校验：已装 whale-widget(0.3.11) 的市场卡片应显示「有更新」，tooltip 含「npm 实时」
-  const rt = await page.evaluate(() => {
-    const card = [...document.querySelectorAll('.dcards-card')].find((c) => ((c.querySelector('.dcards-name') || {}).textContent || '').toLowerCase().includes('whale-widget'))
-    if (!card) return { card: false }
-    const btn = [...card.querySelectorAll('button, span')].find((x) => ['有更新', '已安装'].includes((x.textContent || '').trim()))
-    return { card: true, action: btn ? btn.textContent.trim() : null, title: btn ? btn.title || '' : '', realtime: (btn && btn.title || '').includes('npm 实时') }
+  // T7. 0.8.3 实时版本校验 → 0.8.5 改测 dsh-plugin-cards 卡片（verify 环境必然已装本插件；
+  //     whale-widget 在该环境第 3 次消失，不再作为已装样例）。应显示「有更新」，tooltip 含「npm 实时」
+  const RT_TARGET = 'whale-widget' //MeteorNOX 条目 npm 名 = dsh-whale-widget，0.8.1 双候选键命中已装回显
+  // T4b 把星数 chip 留在 ≥3★ → 先循环回「全部」，否则 0 星目标卡被过滤
+  for (let i = 0; i < 3; i++) {
+    const star = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((e) => /^星数：/.test((e.textContent || '').trim()))
+      if (!b) return null
+      if (!/^星数：全部$/.test((b.textContent || '').trim())) { b.click(); return b.textContent.trim() }
+      return '全部'
+    })
+    if (star === '全部' || star === null) break
+    await sleep(600)
+  }
+  // 目标卡 0 星不在 ★ 最多 首页 → 先用市场搜索框过滤（坑 47：「条中搜索」特有子串定位）
+  await page.evaluate(() => {
+    const inp = [...document.querySelectorAll('input')].find((e) => ((e.placeholder || '')).includes('条中搜索'))
+    if (!inp) return
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(inp, 'whale-widget')
+    inp.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  const assertT7 = rt.card && rt.action === '有更新' && rt.realtime
+  await sleep(1500)
+  const rt = await page.evaluate((target) => {
+    const cards = [...document.querySelectorAll('.dcards-card')].filter((c) => ((c.querySelector('.dcards-name') || {}).textContent || '').toLowerCase().includes(target))
+    const rows = cards.map((card) => {
+      const btn = [...card.querySelectorAll('button, span')].find((x) => ['有更新', '已安装'].includes((x.textContent || '').trim()))
+      const badge = [...card.querySelectorAll('.dcards-badge')].map((x) => (x.textContent || '').trim()).find((t) => /^v\d/.test(t))
+      return {
+        name: (card.querySelector('.dcards-name') || {}).textContent || '',
+        action: btn ? btn.textContent.trim() : null,
+        title: btn ? btn.title || '' : '',
+        badge,
+      }
+    })
+    const hit = rows.find((r) => r.action) || rows[0] || { card: false }
+    return { card: rows.length > 0, rows, ...hit }
+  }, RT_TARGET)
+  const assertT7 = rt.card && rt.action === '有更新' && String(rt.title || '').includes('npm 实时')
   console.log('REALTIME-VER:', JSON.stringify(rt))
+
+  // T8. 0.8.5 徽章实时化：已装插件的市场卡片版本徽章应显示 npm 实时最新版（与「有更新」tooltip 的 latest 一致），而非快照版本
+  const rtBadge = { card: rt.card, badge: rt.badge, latestFromTooltip: (rt.title || '').match(/最新 v([\d.]+)/) ? (rt.title || '').match(/最新 v([\d.]+)/)[1] : null }
+  const assertT8 = rtBadge.card && !!rtBadge.badge && !!rtBadge.latestFromTooltip && rtBadge.badge === 'v' + rtBadge.latestFromTooltip
+  console.log('REALTIME-BADGE:', JSON.stringify(rtBadge))
+
+  // 清搜索框，恢复 T5 的全量卡片视图
+  await page.evaluate(() => {
+    const inp = [...document.querySelectorAll('input')].find((e) => ((e.placeholder || '')).includes('条中搜索'))
+    if (!inp) return
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(inp, '')
+    inp.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await sleep(1200)
 
   // T5. 市场安装 → 确认弹窗 → ✕ 关闭（宿主不变）
   const pkgBefore = hostPkgHas('model-proxy') // 任意基线
@@ -296,8 +342,8 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
 
   const realErrors = errors.filter((e) => !/429|ERR_CONNECTION_REFUSED|Failed to fetch|abort|CORS|gitee\.com|ERR_FAILED|ERR_UNSAFE_PORT/.test(e))
   console.log('pageerrors(real):', realErrors.length ? realErrors.slice(0, 5) : 'none')
-  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT4c && assertT5a && assertT5b && assertT6 && assertT7 && realErrors.length === 0
-  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T4c_newCats: assertT4c, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6, T7_realtime: assertT7 }))
+  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT4c && assertT5a && assertT5b && assertT6 && assertT7 && assertT8 && realErrors.length === 0
+  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T4c_newCats: assertT4c, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6, T7_realtime: assertT7, T8_badge: assertT8 }))
   console.log(ok ? 'ALL-GREEN' : 'FAILED')
   process.exit(ok ? 0 : 1)
 })().catch((e) => { console.error('FATAL', e); process.exit(1) })
