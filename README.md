@@ -40,6 +40,7 @@ dsh plugin --profile <name> add github:yuanzukun/dsh-plugin   # git 安装（pre
 - [x] P0 脚手架 + 加载验证（✅ 2026-09-25 于 dsh-v0.1.7-rc.2 源码宿主实测通过：`pnpm dsh web --patch cordis.dev.patch.yml` 输出 `[dsh-plugin-cards] plugin loaded!`）
 - [x] P1 设置卡片（Schemastery Config，schemastery 3.18.4 打包自包含；配置覆盖 + 默认值补全已实测）
 - [x] P2 对话节点（P2 v1：`cards-annotation` 节点监听 `user/message`，渲染于 chat 目标；客户端产物 `lib/client.js` 为手写闭包工厂格式，修改后跑 `node --check` 校验）
-- [x] P3 打包发布（✅ 2026-09-25 **已发布 npm：[dsh-plugin-cards@0.1.0](https://www.npmjs.com/package/dsh-plugin-cards)**。tarball 安装 + registry 真实安装双路径实测，端到端（安装→启动→加载→客户端 boot graph）全通。npm 发布要求 granular token 勾选 "Bypass two-factor authentication for API and CI"）
+- [x] P3 打包发布（✅ 2026-09-25 **已发布 npm：[dsh-plugin-cards](https://www.npmjs.com/package/dsh-plugin-cards)**。tarball 安装 + registry 真实安装双路径实测，端到端（安装→启动→加载→客户端 boot graph）全通。npm 发布要求 granular token 勾选 "Bypass two-factor authentication for API and CI"）
+- [x] **0.1.1 设置卡片修复**：0.1.7 Web UI 的第三方 bundle 配置**不进设置侧边栏**，必须由客户端注册 `plugins.bundle.config` 槽位（keyed by 包名），渲染在「插件页 → dsh-plugin-cards 详情页」内；表单数据走 `ctx.configForms.get(包名)`（服务端导出的 Config schema 自动成为 settings namespace，ns = patch entry id）。官方范例 ui-settings-web-search。
 - [ ] P2 扩展：自定义 SessionEvent + 模型可见输入（所见即所记）
 - [ ] P4 入驻 awesome-dsh-plugin + dsh-plugin-hub
