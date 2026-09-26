@@ -1,0 +1,61 @@
+# tag 发布流水线：git tag v0.8.x 推送后自动完成 npm publish + npmmirror sync + GitHub Release
+# 发布流程收敛为：bump package.json 版本 → commit → git tag vX.Y.Z → git push --tags
+# 前置条件：GitHub 仓库 Secrets 配置 NPM_TOKEN（granular token，勾选 "Bypass two-factor authentication for API and CI"）
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      # 版本一致性门禁：tag 必须等于 package.json version（防版本漂移/忘 bump）
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME != package.json $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Install & build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Syntax check client bundle
+        run: node --check lib/client.js
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 国内镜像加速：通知 npmmirror 立即拉取新版本（失败不阻断 Release）
+      - name: Trigger npmmirror sync
+        run: |
+          PKG=$(node -p "require('./package.json').name")
+          curl -s -X PUT "https://registry-direct.npmmirror.com/-/package/${PKG}/syncs" \
+            -H "Content-Type: application/json" --max-time 30 || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
