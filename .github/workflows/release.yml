@@ -43,6 +43,14 @@ jobs:
       - name: Syntax check client bundle
         run: node --check lib/client.js
 
+      # 产物一致性守卫：git 安装的用户直接用仓库里的 lib/，必须与 src 构建输出一致（防 src 改了 lib 忘提交）
+      - name: Guard committed lib/ matches build output
+        run: |
+          git diff --exit-code -- lib/ || {
+            echo "::error::lib/ 与 src 构建输出不一致：请本地 pnpm build 后提交 lib/ 再打 tag"
+            exit 1
+          }
+
       - name: Publish to npm
         run: npm publish --access public
         env:
