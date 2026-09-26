@@ -342,8 +342,14 @@ const hostPkgHas = (n) => fs.readFileSync(HOST_PKG, 'utf8').includes(n)
 
   const realErrors = errors.filter((e) => !/429|ERR_CONNECTION_REFUSED|Failed to fetch|abort|CORS|gitee\.com|ERR_FAILED|ERR_UNSAFE_PORT/.test(e))
   console.log('pageerrors(real):', realErrors.length ? realErrors.slice(0, 5) : 'none')
-  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT4c && assertT5a && assertT5b && assertT6 && assertT7 && assertT8 && realErrors.length === 0
-  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T4c_newCats: assertT4c, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6, T7_realtime: assertT7, T8_badge: assertT8 }))
+  // T9. 0.8.7 分发韧性（静态检查）：SNAPSHOT_URLS 三 CDN 候选 + R2 refresh-on-open 节流键存在
+  const src = fs.readFileSync(require('path').join(__dirname, '..', 'lib', 'client.js'), 'utf8')
+  const jsdelivrHosts = (src.match(/https:\/\/(cdn|fastly|gcore)\.jsdelivr\.net\//g) || []).length
+  const assertT9 = jsdelivrHosts >= 3 && src.includes('snapRefreshAt') && src.includes('minBuiltAt')
+  console.log('DIST-RESILIENCE:', JSON.stringify({ jsdelivrHosts, refreshKey: src.includes('snapRefreshAt') }))
+
+  const ok = assertR && assertT1 && assertT2 && assertT3 && assertT4 && assertT4b && assertT4c && assertT5a && assertT5b && assertT6 && assertT7 && assertT8 && assertT9 && realErrors.length === 0
+  console.log('asserts:', JSON.stringify({ R_ready: assertR, T1_tabs: assertT1, T2_installed: assertT2, T3_custom: assertT3, T4_settings: assertT4, T4b_toolbar: assertT4b, T4c_newCats: assertT4c, T5_modal: assertT5a && assertT5b, T6_customModal: assertT6, T7_realtime: assertT7, T8_badge: assertT8, T9_dist: assertT9 }))
   console.log(ok ? 'ALL-GREEN' : 'FAILED')
   process.exit(ok ? 0 : 1)
 })().catch((e) => { console.error('FATAL', e); process.exit(1) })
