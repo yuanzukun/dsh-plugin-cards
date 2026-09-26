@@ -52,7 +52,12 @@ jobs:
           }
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::NPM_TOKEN 为空或不存在：请检查仓库 Settings → Secrets and variables → Actions 的 Repository secrets 里是否有名为 NPM_TOKEN（区分大小写）的条目；若配在 Environment secrets 下 job 不会继承"
+            exit 1
+          fi
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
