@@ -6,4 +6,4 @@ lib/*
 .DS_Store
 .workbuddy/
 *.tgz
-scripts/debug-*.png
+scripts/*.png
