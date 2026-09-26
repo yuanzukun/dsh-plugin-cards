@@ -1,6 +1,7 @@
 node_modules/
 lib/*
 !lib/client.js
+!lib/index.js
 *.log
 .DS_Store
 .workbuddy/

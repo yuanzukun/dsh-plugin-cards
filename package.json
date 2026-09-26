@@ -30,7 +30,8 @@
   },
   "scripts": {
     "build": "tsdown && node -e \"require('fs').accessSync('lib/client.js'); console.log('client.js present OK')\"",
-    "dev": "tsdown --watch"
+    "dev": "tsdown --watch",
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
