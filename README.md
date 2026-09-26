@@ -62,6 +62,16 @@ pnpm dsh --profile web --dump-config   # 应出现 "# == dsh-plugin-cards" 层
 - [ ] P2 扩展：自定义 SessionEvent + 模型可见输入（所见即所记）
 - [ ] P4 入驻 awesome-dsh-plugin + dsh-plugin-hub
 
+## 发布（tag 流水线）
+
+```sh
+# ① bump package.json 版本 → commit
+# ② 打 tag 推送，其余全自动（版本门禁 → build → 语法检查 → npm publish → npmmirror sync → GitHub Release）
+git tag v0.8.13 && git push --tags
+```
+
+前置：仓库 Secret `NPM_TOKEN`（granular token，勾选 Bypass 2FA for API and CI）。
+
 ## License
 
 [MIT](./LICENSE) © yuanzukun
