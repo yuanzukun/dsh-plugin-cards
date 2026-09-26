@@ -15,7 +15,7 @@
 const puppeteer = require('C:/Users/54622/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core')
 const fs = require('fs')
 
-const URL = 'http://127.0.0.1:3080/?token=bvd3m4iT6DNhdIIff4wOt8UW_O7bAD_FaR5ndEoN7ro'
+const URL = 'http://127.0.0.1:3080/?token=RG0xdn-Nx9pLOHzwmBxm1gpxpqz84H0idW74gEQXtCQ'
 const SNAP_URL = 'http://127.0.0.1:8941/cards-snapshot.json'
 const HOST_PKG = 'D:/ruan/dsh-home-npm/profiles/web/package.json'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
