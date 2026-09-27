@@ -1,0 +1,1060 @@
+{
+  "quality_total_existing": 3086,
+  "new_repos_total": 207,
+  "new_repos": [
+    {
+      "full_name": "QTATQ233/dsh-jingcha",
+      "stars": 0,
+      "created_at": "2026-09-27T18:07:16Z",
+      "pushed_at": "2026-09-27T18:44:24Z",
+      "description": "DSH 运行时监察：工具调用 / 事件循环 / 错误风暴实时体检 + 按调用强制停止 + 右下角红绿灯挂件（0 token）",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "bigbigtooth/DSH-DevOps-Plugin",
+      "stars": 0,
+      "created_at": "2026-09-27T10:59:56Z",
+      "pushed_at": "2026-09-27T18:29:05Z",
+      "description": "DSH 远程运维插件：SSH 服务器管理、硬件/进程/日志监控、只读 AI 巡检、Git 部署闭环。 Remote operations for DeepSee",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "MerkurevSergei/dsh-notion-oauth-ui",
+      "stars": 0,
+      "created_at": "2026-09-27T16:47:07Z",
+      "pushed_at": "2026-09-27T18:29:56Z",
+      "description": "Notion integration for DeepSeek Harness via the official Notion MCP (OAuth 2.0 +",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "ONEOne-1v1/dsh-github-upload",
+      "stars": 0,
+      "created_at": "2026-09-26T09:36:16Z",
+      "pushed_at": "2026-09-27T18:17:30Z",
+      "description": "",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-netguard",
+      "stars": 0,
+      "created_at": "2026-09-27T17:39:21Z",
+      "pushed_at": "2026-09-27T18:16:08Z",
+      "description": "dsh 插件：出网护栏——只放公网、重定向逐跳复查、边读边限大小（防 SSRF） · Egress guard for dsh: public addresse",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "mingdui/dsh-growth-workbench",
+      "stars": 0,
+      "created_at": "2026-09-26T08:31:55Z",
+      "pushed_at": "2026-09-27T18:12:04Z",
+      "description": "面向普通用户的AI个人成长工作台：画像 → 能力模型 → 90 天计划 → 今日执行 → 证据 → 考核复盘。基于DSH底座。",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "NeoWangKing/dsh-activity-line",
+      "stars": 0,
+      "created_at": "2026-09-27T18:05:42Z",
+      "pushed_at": "2026-09-27T18:06:15Z",
+      "description": "DeepSeek Harness web plugin: a live activity line under the composer (source of ",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-onebot",
+      "stars": 0,
+      "created_at": "2026-09-27T17:39:27Z",
+      "pushed_at": "2026-09-27T18:03:14Z",
+      "description": "dsh 插件：QQ 通道（OneBot 11 标准客户端）——正向 WebSocket + HTTP，把你的 Agent 接进 QQ 群和私聊，零依赖 · On",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-group-feed",
+      "stars": 0,
+      "created_at": "2026-09-27T17:39:24Z",
+      "pushed_at": "2026-09-27T18:03:11Z",
+      "description": "dsh 插件：群聊上下文投喂——非 @ 的消息攒批挂进上下文（零 token、不唤醒模型），每天再压成日结 · Batched group-chat conte",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-carryover",
+      "stars": 0,
+      "created_at": "2026-09-27T17:39:19Z",
+      "pushed_at": "2026-09-27T18:03:07Z",
+      "description": "dsh 插件：会话交接——开新会话前先把上一段摘要成笔记，笔记真的落盘了才允许删旧轨迹 · Session handover for dsh: summariz",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-sticker-library",
+      "stars": 0,
+      "created_at": "2026-09-27T14:38:09Z",
+      "pushed_at": "2026-09-27T18:03:05Z",
+      "description": "dsh 插件：聊天表情包库——收图去重、视觉打标、按含义挑图，脏话与烂梗在入库那一刻拦掉 · Sticker library for dsh: dedup, v",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-voice-transcribe",
+      "stars": 0,
+      "created_at": "2026-09-27T03:32:06Z",
+      "pushed_at": "2026-09-27T18:03:03Z",
+      "description": "dsh 插件：本地语音/视频转写——QQ/微信那种 SILK 语音先解码，再用 faster-whisper 转成文字，全程不花 API 钱 · Local s",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "JackZo400/dsh-memory-search",
+      "stars": 0,
+      "created_at": "2026-09-27T03:26:45Z",
+      "pushed_at": "2026-09-27T18:03:01Z",
+      "description": "Markdown 笔记变成 Agent 的长期记忆：本地 embedding + SQLite FTS5 混合召回，可选密级过滤（dsh 插件）· Long-t",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Fishsb/DSH-Mana",
+      "stars": 0,
+      "created_at": "2026-09-26T08:03:16Z",
+      "pushed_at": "2026-09-27T18:02:39Z",
+      "description": "Mana（末那识）：认知架构模拟与长期 AI 助手 —— 基于人类记忆架构的认知内核（DSH 插件集）",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "xbzbing/dsh-decision-layer",
+      "stars": 0,
+      "created_at": "2026-09-26T09:23:09Z",
+      "pushed_at": "2026-09-27T17:42:17Z",
+      "description": "A structured decision layer for the DeepSeek Harness agent loop, backed by a plu",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "kangtsang/dsh-worktree-space",
+      "stars": 0,
+      "created_at": "2026-09-26T02:06:16Z",
+      "pushed_at": "2026-09-27T17:34:58Z",
+      "description": "dsh-worktree-space is a DSH plugin that creates isolated multi-repo workspaces f",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "lyp88997/dsh-browser-service",
+      "stars": 0,
+      "created_at": "2026-09-26T16:09:21Z",
+      "pushed_at": "2026-09-27T17:32:52Z",
+      "description": "自建 DSH 浏览器服务：单例 CDP 守护 + DSH ctx.browser provider + 兼容 dsh-univer-office 的可执行包装（",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Leafstory/dsh-context-checkpoint",
+      "stars": 1,
+      "created_at": "2026-09-27T16:40:50Z",
+      "pushed_at": "2026-09-27T17:29:43Z",
+      "description": "为解决 DeepSeek V4.1 Flash 在 DSH 长上下文下丢失结论 / 幻觉升高而做的自动总结-压缩-注入插件：达限 → 总结落盘 → 自动压缩 →",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "supengpeng/dsh-ssh",
+      "stars": 0,
+      "created_at": "2026-09-27T01:48:07Z",
+      "pushed_at": "2026-09-27T17:25:10Z",
+      "description": "SSH plugin for DSH (DeepSeek Harness): connection, exec/PTY, SFTP transfer, righ",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "yfwu2020/dsh-think-flow",
+      "stars": 0,
+      "created_at": "2026-09-27T16:04:16Z",
+      "pushed_at": "2026-09-27T17:24:21Z",
+      "description": "DSH 思维链可视化：把模型的实时思考按 turn → step →（思考原文 + 工具调用）聚合成可读的右侧栏视图",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-perf",
+      "stars": 1,
+      "created_at": "2026-09-27T16:37:31Z",
+      "pushed_at": "2026-09-27T17:16:44Z",
+      "description": "Windows host performance counters from WSL: CPU, memory, disk and top processes.",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-power",
+      "stars": 1,
+      "created_at": "2026-09-27T16:35:42Z",
+      "pushed_at": "2026-09-27T17:16:31Z",
+      "description": "Windows power state from WSL: active power plan, battery status and sleep settin",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-defender",
+      "stars": 1,
+      "created_at": "2026-09-27T16:36:36Z",
+      "pushed_at": "2026-09-27T17:16:28Z",
+      "description": "Windows security posture from WSL: Defender antivirus status and firewall profil",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Theflowyears/dsh-arknights-theme",
+      "stars": 1,
+      "created_at": "2026-09-27T04:56:40Z",
+      "pushed_at": "2026-09-27T17:16:26Z",
+      "description": "Arknights theme pack for the DeepSeek Harness Web GUI: wallpapers with saturatio",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-registry",
+      "stars": 1,
+      "created_at": "2026-09-27T16:37:47Z",
+      "pushed_at": "2026-09-27T17:16:25Z",
+      "description": "Read-only Windows registry access from WSL, restricted to an allowlist of key pr",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-eventlog",
+      "stars": 1,
+      "created_at": "2026-09-27T16:38:02Z",
+      "pushed_at": "2026-09-27T17:16:22Z",
+      "description": "Read recent Windows event log entries from WSL, by log name and level.",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-service",
+      "stars": 1,
+      "created_at": "2026-09-27T16:35:59Z",
+      "pushed_at": "2026-09-27T17:16:19Z",
+      "description": "Read Windows service state from WSL: list services and inspect one by name.",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-winctl",
+      "stars": 1,
+      "created_at": "2026-09-27T16:38:19Z",
+      "pushed_at": "2026-09-27T17:03:22Z",
+      "description": "Enumerate and control Windows top-level windows from WSL: activate, minimize, re",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "HapyRain/dsh-router-laya",
+      "stars": 1,
+      "created_at": "2026-09-26T04:08:29Z",
+      "pushed_at": "2026-09-27T17:02:35Z",
+      "description": "Auto tier routing for DSH: a locally fine-tuned model picks low/high/max thinkin",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-winshot",
+      "stars": 1,
+      "created_at": "2026-09-27T16:36:16Z",
+      "pushed_at": "2026-09-27T17:00:52Z",
+      "description": "Capture a specific Windows window to a WSL file, by process id or the foreground",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-wininput",
+      "stars": 1,
+      "created_at": "2026-09-27T16:37:11Z",
+      "pushed_at": "2026-09-27T16:58:46Z",
+      "description": "Targeted Windows input from WSL: invoke a UI Automation element, or send keys an",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "173787247/dsh-wsl-uia",
+      "stars": 1,
+      "created_at": "2026-09-27T16:36:56Z",
+      "pushed_at": "2026-09-27T16:58:42Z",
+      "description": "Windows UI Automation observation from WSL: enumerate top-level windows and read",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "luobosibing2/deepseek-harness-jev",
+      "stars": 1,
+      "created_at": "2026-09-27T15:36:12Z",
+      "pushed_at": "2026-09-27T16:54:23Z",
+      "description": "Native DeepSeek Harness (DSH) plugin integrating TypeSafe Jev as a System One de",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "jr-create/dsh-prompt-wisp",
+      "stars": 0,
+      "created_at": "2026-09-27T03:35:52Z",
+      "pushed_at": "2026-09-27T16:51:30Z",
+      "description": "提示词精灵 — 在 DeepSeek Harness 输入框旁一键把草稿优化成结构化提示词 / One-click prompt optimization bu",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "G57651/dsh-session-manager",
+      "stars": 0,
+      "created_at": "2026-09-27T12:50:57Z",
+      "pushed_at": "2026-09-27T16:46:46Z",
+      "description": "DeepSeek Harness 会话管理面板插件：全部/已归档/已删除视图、批量管理、软删除回收站",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "jeffreyren1/dsh-custom-js",
+      "stars": 1,
+      "created_at": "2026-09-27T15:53:23Z",
+      "pushed_at": "2026-09-27T16:35:52Z",
+      "description": "Customize DeepSeek Harness without forking it—load, edit, manage, and hot-reload",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "oiuv/dsh-achievements",
+      "stars": 0,
+      "created_at": "2026-09-27T16:30:06Z",
+      "pushed_at": "2026-09-27T16:34:41Z",
+      "description": "Usage statistics and achievements for DeepSeek Harness — track your progress, ex",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Aeroscis/dsh-temptask",
+      "stars": 0,
+      "created_at": "2026-09-27T09:59:29Z",
+      "pushed_at": "2026-09-27T16:32:46Z",
+      "description": "Temporary task mode for DeepSeek Harness (dsh) — one-click disposable working di",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "weibaohui/dsh-dashboard",
+      "stars": 0,
+      "created_at": "2026-09-27T12:22:33Z",
+      "pushed_at": "2026-09-27T16:27:37Z",
+      "description": "dsh 插件 · 使用量仪表盘：离线扫描会话日志的统计分析与可编排 Dashboard（gridstack + ECharts）",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "dianziboluo/dsh-cost-meter-bai-credits",
+      "stars": 0,
+      "created_at": "2026-09-27T16:22:38Z",
+      "pushed_at": "2026-09-27T16:22:46Z",
+      "description": "Show your B.AI Credits balance inside dsh-cost-meter. Bilingual (EN/ZH) recipe w",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "crossoverthere/dsh-whale-desktop",
+      "stars": 1,
+      "created_at": "2026-09-27T12:49:56Z",
+      "pushed_at": "2026-09-27T16:17:45Z",
+      "description": "桌面级鲸鱼娘桌宠：基于dsh-whale-widget（DSH 插件版），做成透明置顶、可点击穿透的 Windows 桌面挂件（Electron）",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "s11phere/dsh-btw-sidebar",
+      "stars": 0,
+      "created_at": "2026-09-27T16:07:13Z",
+      "pushed_at": "2026-09-27T16:08:55Z",
+      "description": "dsh plugin: Codex-style /btw — fork the current conversation into the native rig",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "xiaohanqing/dsh-relay",
+      "stars": 0,
+      "created_at": "2026-09-26T15:39:07Z",
+      "pushed_at": "2026-09-27T16:06:06Z",
+      "description": "手机随时访问你自己的 DSH —— 流量走你自己的服务端，不依赖任何第三方云。",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "rinDBeans/codex-ui",
+      "stars": 2,
+      "created_at": "2026-09-26T10:37:02Z",
+      "pushed_at": "2026-09-27T16:01:56Z",
+      "description": "DSH Web 的 Codex 化界面插件 · A Codex-style interface plugin for DSH Web",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "weibaohui/dsh-matrix",
+      "stars": 0,
+      "created_at": "2026-09-26T12:53:20Z",
+      "pushed_at": "2026-09-27T15:51:51Z",
+      "description": "dsh 插件 · 黑客帝国数字雨：对话窗口铺上经典字符雨背景，token 原文掺进雨里，雨势随 agent 活跃度起伏",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "viyiviyi/dsh-tree-task-flow",
+      "stars": 0,
+      "created_at": "2026-09-27T13:19:52Z",
+      "pushed_at": "2026-09-27T15:50:56Z",
+      "description": "树形任务流 · DeepSeek Harness 插件：把多步任务组织成目标→任务→子任务三级树，节点完成时由 AI 提交结果，插件随即把该节点的执行过程从上下",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Headmaster218/dsh-llm-moe4all",
+      "stars": 0,
+      "created_at": "2026-09-26T05:12:01Z",
+      "pushed_at": "2026-09-27T15:47:56Z",
+      "description": "Local MoE4All engine provider for DeepSeek Harness. / DeepSeek Harness MoE4All ",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "643048695/dsh-compaction-route",
+      "stars": 0,
+      "created_at": "2026-09-27T15:30:45Z",
+      "pushed_at": "2026-09-27T15:46:14Z",
+      "description": "Pick the DeepSeek Harness conversation-compaction summarizer in the Web settings",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "ffyfox/dsh-desktop-linux",
+      "stars": 2,
+      "created_at": "2026-09-26T05:29:21Z",
+      "pushed_at": "2026-09-27T15:42:53Z",
+      "description": "将官方 DeepSeek Harness 桌面打包移植到 Linux：AppImage、deb、rpm 和 Arch PKGBUILD，并通过一套 12 个补丁",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "ZhaoZeW/dsh-rollback",
+      "stars": 0,
+      "created_at": "2026-09-26T11:08:03Z",
+      "pushed_at": "2026-09-27T15:32:22Z",
+      "description": "TRAE-style conversation rollback for DeepSeek Harness: per-turn checkpoints, in-",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "tayuLuc/dsh-ru-voice-input",
+      "stars": 0,
+      "created_at": "2026-09-27T09:09:12Z",
+      "pushed_at": "2026-09-27T15:20:38Z",
+      "description": "Russian-first Voice input for DeepSeek Harness: local GigaAM v3 with punctuation",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "zeusxx/dsh-composer-live",
+      "stars": 0,
+      "created_at": "2026-09-27T03:29:10Z",
+      "pushed_at": "2026-09-27T14:55:24Z",
+      "description": "Live Markdown rendering and typing enhancements for the DSH web composer - synta",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "mimajiushi/dsh-plugins",
+      "stars": 0,
+      "created_at": "2026-09-27T14:44:05Z",
+      "pushed_at": "2026-09-27T14:53:14Z",
+      "description": "DeepSeek Harness (dsh) community plugins: AgentTeams approval switch and limits ",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "SFLAQiu/dsh-waker",
+      "stars": 1,
+      "created_at": "2026-09-27T03:29:37Z",
+      "pushed_at": "2026-09-27T14:48:09Z",
+      "description": "正在苏醒的数字员工",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "yang101and/dsh-cyber-muyu",
+      "stars": 0,
+      "created_at": "2026-09-27T14:38:43Z",
+      "pushed_at": "2026-09-27T14:42:56Z",
+      "description": "Cyber wooden fish (muyu) plugin for DeepSeek Harness: every agent tool call earn",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "cnyc6n/dsh-uia-agent",
+      "stars": 0,
+      "created_at": "2026-09-27T09:05:04Z",
+      "pushed_at": "2026-09-27T14:40:04Z",
+      "description": "Windows UI Automation agent for DeepSeek Harness: enumerate/snapshot/find/click/",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "cnyc6n/uia-agent",
+      "stars": 0,
+      "created_at": "2026-09-27T09:55:25Z",
+      "pushed_at": "2026-09-27T14:39:58Z",
+      "description": "Windows UI Automation agent - single C++ exe (enumerate/snapshot/find/click/set_",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "shiyan688/dsh-paperdesk",
+      "stars": 0,
+      "created_at": "2026-09-26T05:27:18Z",
+      "pushed_at": "2026-09-27T14:37:13Z",
+      "description": "DSH paper workbench: arXiv search → local library (metadata/PDF/full text) → L1/",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "qingyou002/dsh-git-commit",
+      "stars": 0,
+      "created_at": "2026-09-27T14:23:19Z",
+      "pushed_at": "2026-09-27T14:24:12Z",
+      "description": "DSH slash command /commit: stages all changes, summarizes the staged diff with t",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "john-walks-slow/dsh-live2d-voice",
+      "stars": 0,
+      "created_at": "2026-09-27T07:39:18Z",
+      "pushed_at": "2026-09-27T14:16:42Z",
+      "description": "Live2D companion for DeepSeek Harness (DSH): realtime TTS voice, continuous spee",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "longgege-cd/dsh-skin-pixel-anime",
+      "stars": 0,
+      "created_at": "2026-09-26T06:10:22Z",
+      "pushed_at": "2026-09-27T14:07:14Z",
+      "description": "Pixel-anime skin plugin for DeepSeek Harness web UI: palettes, pixel fonts (incl",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "functy23/dsh-mcp-studio",
+      "stars": 1,
+      "created_at": "2026-09-26T13:13:05Z",
+      "pushed_at": "2026-09-27T14:00:36Z",
+      "description": "DeepSeek Harness 的 MCP 服务与 Skills 管理器：面板里增删改 MCP 行、扫描导入其他 Agent 配置、管理 Skills（DSH",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Rosa42/dsh-sync",
+      "stars": 0,
+      "created_at": "2026-09-27T13:54:08Z",
+      "pushed_at": "2026-09-27T13:55:41Z",
+      "description": "DeepSeek Harness plugin: sync sessions and profile configuration across machines",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "LeeLizuoLiu/rice-patrol",
+      "stars": 0,
+      "created_at": "2026-09-26T16:45:45Z",
+      "pushed_at": "2026-09-27T13:53:56Z",
+      "description": "Rice Patrol: a bounded reasoning loop guard and clean recovery plugin for DeepSe",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "mic1on/dsh-read",
+      "stars": 0,
+      "created_at": "2026-09-27T13:38:04Z",
+      "pushed_at": "2026-09-27T13:40:11Z",
+      "description": "Read local EPUB / MOBI / text books inside DeepSeek Harness: /read streams the t",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "5havv/dsh-weixin",
+      "stars": 0,
+      "created_at": "2026-09-26T15:04:09Z",
+      "pushed_at": "2026-09-27T13:34:40Z",
+      "description": "WeChat channel plugin for DeepSeek Harness, over Tencent's iLink Bot API",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "MCXCC303/dsh-hdsl-3dmodel",
+      "stars": 0,
+      "created_at": "2026-09-27T13:16:09Z",
+      "pushed_at": "2026-09-27T13:26:53Z",
+      "description": "",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Zessi-C/dsh-model-thinking-levels",
+      "stars": 0,
+      "created_at": "2026-09-27T06:31:15Z",
+      "pushed_at": "2026-09-27T13:26:37Z",
+      "description": "Per-model thinking levels (reasoningEfforts) for custom DSH llm-pi-ai routes, wi",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "G57651/dsh-dual-checkin",
+      "stars": 0,
+      "created_at": "2026-09-26T14:44:08Z",
+      "pushed_at": "2026-09-27T13:25:08Z",
+      "description": "DeepSeek Harness 插件 — Trae 与 WorkBuddy 每日自动签到（本机登录态、双平台互不阻塞、积分与到期提醒）",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "G57651/dsh-one-click-restart",
+      "stars": 0,
+      "created_at": "2026-09-26T14:45:47Z",
+      "pushed_at": "2026-09-27T13:06:53Z",
+      "description": "One-click restart plugin for DeepSeek Harness: sidebar button + detached watchdo",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Leaveing00001/dsh-fusion360",
+      "stars": 1,
+      "created_at": "2026-09-27T13:03:42Z",
+      "pushed_at": "2026-09-27T13:05:40Z",
+      "description": "Drive Autodesk Fusion 360 from DeepSeek Harness (DSH) - 13 MCP tools including a",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "2211431960/dsh-wallpaper-theme",
+      "stars": 0,
+      "created_at": "2026-09-27T12:56:58Z",
+      "pushed_at": "2026-09-27T13:02:24Z",
+      "description": "Wallpaper + liquid glass theme for DeepSeek Harness. No runtime dependencies.",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "LexFlowApp/LexFlow",
+      "stars": 1,
+      "created_at": "2026-09-26T02:29:58Z",
+      "pushed_at": "2026-09-27T12:06:22Z",
+      "description": "Local-first macOS desktop app for legal work — conversation, workflows, archive,",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "wbb316/dsh-novel",
+      "stars": 2,
+      "created_at": "2026-09-27T11:59:16Z",
+      "pushed_at": "2026-09-27T12:02:55Z",
+      "description": "DSH 插件：小说创作台 —— 给 agent 5 个 novel_* 工具 + 一个能改设定、画关系图、一键续写并流式直播的右侧栏面板",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "fzy-yy/dsh-mcp-inventory",
+      "stars": 0,
+      "created_at": "2026-09-27T09:59:10Z",
+      "pushed_at": "2026-09-27T11:27:53Z",
+      "description": "DeepSeek Harness plugin: a Settings page listing the MCP servers the current pro",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "catsenior507/dsh-command-center",
+      "stars": 0,
+      "created_at": "2026-09-27T11:23:07Z",
+      "pushed_at": "2026-09-27T11:23:19Z",
+      "description": "Command center for DeepSeek Harness: watch running background jobs in one panel,",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "rezon-aki/dsh-doc-kit",
+      "stars": 0,
+      "created_at": "2026-09-27T06:10:01Z",
+      "pushed_at": "2026-09-27T11:22:44Z",
+      "description": "文档体系体检：只读工具 doc_lint（注入层配额 / 被禁措辞 / 索引路径 / 是否进 git）+ 随包 doc-governance 技能",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "David7583/baigong_research_atlas",
+      "stars": 1,
+      "created_at": "2026-09-27T10:14:03Z",
+      "pushed_at": "2026-09-27T11:17:08Z",
+      "description": "Local research continuity across agents and AI clients, with versioned tasks, tr",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "upcyan/dsh-mimo-extension",
+      "stars": 0,
+      "created_at": "2026-09-27T05:12:12Z",
+      "pushed_at": "2026-09-27T11:11:13Z",
+      "description": "MiMo (Xiaomi) quota ring and usage detail tab for DeepSeek Harness",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "KAsyori/dsh-unicode-guard",
+      "stars": 0,
+      "created_at": "2026-09-27T11:00:11Z",
+      "pushed_at": "2026-09-27T11:08:42Z",
+      "description": "DSH plugin: keeps the glyph class that trips content moderation out of every mod",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Finderchangchang/brewreel",
+      "stars": 65,
+      "created_at": "2026-09-26T01:52:24Z",
+      "pushed_at": "2026-09-27T11:01:47Z",
+      "description": "精酿 BrewReel：让 DeepSeek 这类便宜模型也能做出好看的竖版宣传片。写一份产品简报，AI 挑镜头、写文案，一条命令出片。3 种配方、6 个行业、",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "sviktor75/dsh-sound-notification",
+      "stars": 0,
+      "created_at": "2026-09-27T09:31:56Z",
+      "pushed_at": "2026-09-27T10:34:01Z",
+      "description": "DeepSeek Harness Web plugin: plays a chime when any session's response finishes ",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "koinrokka/dsh-plugins",
+      "stars": 0,
+      "created_at": "2026-09-27T09:16:09Z",
+      "pushed_at": "2026-09-27T10:29:46Z",
+      "description": "dsh (DeepSeek Harness) extension bundles for Koinrokka: sandbox runtime provider",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "rajpaulsingh6-stack/dsh-genoffice-captain",
+      "stars": 0,
+      "created_at": "2026-09-27T09:31:07Z",
+      "pushed_at": "2026-09-27T10:23:13Z",
+      "description": "DeepSeek Harness plugin: launch GenOffice for GenOffice task-list skills, or des",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Sen70s/dsh-workspace-plus",
+      "stars": 0,
+      "created_at": "2026-09-27T08:57:04Z",
+      "pushed_at": "2026-09-27T09:53:08Z",
+      "description": "增强deepseek harness的工作区的多级目录功能",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "HuaiminHuang/dsh-subscription-plugin",
+      "stars": 0,
+      "created_at": "2026-09-27T08:07:36Z",
+      "pushed_at": "2026-09-27T09:51:58Z",
+      "description": "Experimental DeepSeek Harness (DSH) plugin for ChatGPT/Codex subscription sign-i",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "kyle123740/dsh-message-recall",
+      "stars": 1,
+      "created_at": "2026-09-26T18:20:07Z",
+      "pushed_at": "2026-09-27T09:50:50Z",
+      "description": "删掉不喜欢的 AI 回复，或删掉已发送的错误提示词 —— 每条消息可撤回 / 删除 / 删除此处及之后（DSH 插件，append-only 墓碑，模型上下文与",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "pandarayc/dsh-skill-tier",
+      "stars": 0,
+      "created_at": "2026-09-27T09:32:33Z",
+      "pushed_at": "2026-09-27T09:41:05Z",
+      "description": "Progressive disclosure for DSH skill collections: one generated index skill stay",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "ChengqianHuang/dsh-personal",
+      "stars": 0,
+      "created_at": "2026-09-27T00:21:39Z",
+      "pushed_at": "2026-09-27T09:40:52Z",
+      "description": "Personal assistant bundle for DeepSeek Harness: natural-language capture, query,",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "MuzeWinter/dscomputer-control",
+      "stars": 0,
+      "created_at": "2026-09-27T09:32:50Z",
+      "pushed_at": "2026-09-27T09:38:06Z",
+      "description": "Windows desktop automation for DeepSeek Harness: 14 tools for real GUI input (cl",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Paimonshen/dsh-coding-plugin",
+      "stars": 0,
+      "created_at": "2026-09-27T06:46:29Z",
+      "pushed_at": "2026-09-27T09:20:36Z",
+      "description": "代码学习插件 — DSH 动态 Cordis 插件：悬浮窗代码编辑器/多语言执行/课程关卡评判/分析直投对话",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "NMTZ-z/system-one-benchmark-lab",
+      "stars": 1,
+      "created_at": "2026-09-26T13:10:33Z",
+      "pushed_at": "2026-09-27T09:12:59Z",
+      "description": "",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "miqian-nomad/dsh-browser-playwright-codex",
+      "stars": 0,
+      "created_at": "2026-09-26T02:59:28Z",
+      "pushed_at": "2026-09-27T08:55:08Z",
+      "description": "DSH 的浏览器：登录一次，它就用你的账号替你办事（查后台/填表/抓列表/多标签）；要登录、验证码、弹框会停下来等你，绝不替你点「确定」；你最小化它就不吵你，A",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "jetformat/dsh-plugin",
+      "stars": 0,
+      "created_at": "2026-09-27T08:53:00Z",
+      "pushed_at": "2026-09-27T08:53:06Z",
+      "description": "DeepSeek Harness plugin for Jetformat: Office to PDF and PDF tools via the local",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "underworld-oddball/sh-volume-shuff",
+      "stars": 0,
+      "created_at": "2026-09-27T01:51:58Z",
+      "pushed_at": "2026-09-27T08:40:51Z",
+      "description": "Read the newest turn aloud from the DSH composer",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Sostay/dsh-wallpaper",
+      "stars": 0,
+      "created_at": "2026-09-27T08:21:09Z",
+      "pushed_at": "2026-09-27T08:21:13Z",
+      "description": "Custom full-window wallpaper plugin for DeepSeek Harness (DSH): gradient presets",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "b8yg7vjstj-ctrl/dsh-llamacpp-bridge",
+      "stars": 0,
+      "created_at": "2026-09-27T07:38:42Z",
+      "pushed_at": "2026-09-27T08:13:32Z",
+      "description": "DeepSeek Harness plugin: local llama.cpp (llama-server) as a first-class model p",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "luckbiao/dsh-markdown-highlighter",
+      "stars": 0,
+      "created_at": "2026-09-27T07:37:50Z",
+      "pushed_at": "2026-09-27T07:37:55Z",
+      "description": "Rich syntax highlighting for DSH Markdown: activates builtin Shiki theme colors ",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "yousj666/dsh-audio-converter",
+      "stars": 0,
+      "created_at": "2026-09-27T07:14:09Z",
+      "pushed_at": "2026-09-27T07:16:18Z",
+      "description": "DSH 音频转换器：解密网易云 NCM / 酷我 KWM / 酷狗 KGM / QQ音乐 QMC，格式互转 + 音质增强（EBU R128 响度归一化、EQ、重",
+      "archived": false,
+      "fork": false
+    },
+    {
+      "full_name": "Timebro9999/dsh-session-deck",
+      "stars": 0,
+      "created_at": "2026-09-27T04:57:18Z",
+      "pushed_at": "2026-09-27T06:35:01Z",
+      "description": "Manage your whole workspace in the DeepSeek Harness sidebar: a pinned band for p",
+      "archived": false,
+      "fork": false
+    }
+  ],
+  "quality_pushed_total": 3091,
+  "quality_pushed_top": [
+    {
+      "full_name": "bradeGithub/DSH-Plugins-Marketplace",
+      "stars": 168,
+      "pushed_at": "2026-09-27T18:44:20Z"
+    },
+    {
+      "full_name": "Likenttt/garmin-connect-plugin-for-dsh",
+      "stars": 22,
+      "pushed_at": "2026-09-27T18:44:00Z"
+    },
+    {
+      "full_name": "DDDMUC/dsh-edit-turn",
+      "stars": 3,
+      "pushed_at": "2026-09-27T18:43:39Z"
+    },
+    {
+      "full_name": "kejixiaoliang/awesome-dsh-plugins",
+      "stars": 44,
+      "pushed_at": "2026-09-27T18:43:34Z"
+    },
+    {
+      "full_name": "elangan1997-cmyk/dsh-canvas-suite",
+      "stars": 3,
+      "pushed_at": "2026-09-27T18:42:23Z"
+    },
+    {
+      "full_name": "ZASENJC/dsh-plugins-store",
+      "stars": 69,
+      "pushed_at": "2026-09-27T18:39:56Z"
+    },
+    {
+      "full_name": "YELEBAI/dsh-plugin-marketplace",
+      "stars": 20,
+      "pushed_at": "2026-09-27T18:39:41Z"
+    },
+    {
+      "full_name": "bowenliang123/dsh-context",
+      "stars": 1545,
+      "pushed_at": "2026-09-27T18:37:50Z"
+    },
+    {
+      "full_name": "bruc3van/awesome-dsh-plugin",
+      "stars": 368,
+      "pushed_at": "2026-09-27T18:37:11Z"
+    },
+    {
+      "full_name": "evoelsewhere/evoflux",
+      "stars": 10,
+      "pushed_at": "2026-09-27T18:35:21Z"
+    },
+    {
+      "full_name": "liustack/pptwise",
+      "stars": 16,
+      "pushed_at": "2026-09-27T18:33:20Z"
+    },
+    {
+      "full_name": "esengine/DeepSeek-Reasonix",
+      "stars": 35705,
+      "pushed_at": "2026-09-27T18:36:48Z"
+    },
+    {
+      "full_name": "GooDAnDReaDY/dsh-key-rotation",
+      "stars": 8,
+      "pushed_at": "2026-09-27T18:32:57Z"
+    },
+    {
+      "full_name": "zp-home/dsh-recommend",
+      "stars": 21,
+      "pushed_at": "2026-09-27T18:32:23Z"
+    },
+    {
+      "full_name": "Shaky77/weiwen-law-dsh",
+      "stars": 14,
+      "pushed_at": "2026-09-27T18:30:18Z"
+    },
+    {
+      "full_name": "zbsph/dsh-ppt-studio",
+      "stars": 3,
+      "pushed_at": "2026-09-27T18:28:57Z"
+    },
+    {
+      "full_name": "whyihaveyou/dsh-suite",
+      "stars": 56,
+      "pushed_at": "2026-09-27T18:27:56Z"
+    },
+    {
+      "full_name": "HaoyueQin/deepseek-harness-background",
+      "stars": 4,
+      "pushed_at": "2026-09-27T18:27:37Z"
+    },
+    {
+      "full_name": "jiesou/dsh-stream-rules",
+      "stars": 4,
+      "pushed_at": "2026-09-27T18:32:35Z"
+    },
+    {
+      "full_name": "jiesou/dsh-opencode-zen-free-provider",
+      "stars": 5,
+      "pushed_at": "2026-09-27T18:32:32Z"
+    },
+    {
+      "full_name": "jiesou/dsh-commandcode-go-provider",
+      "stars": 17,
+      "pushed_at": "2026-09-27T18:32:26Z"
+    },
+    {
+      "full_name": "jiesou/dsh-cline-free-provider",
+      "stars": 10,
+      "pushed_at": "2026-09-27T18:32:22Z"
+    },
+    {
+      "full_name": "chnjames/dsh-plugin-market",
+      "stars": 6,
+      "pushed_at": "2026-09-27T18:22:01Z"
+    },
+    {
+      "full_name": "OMSociety/dsh-kimi-ppt",
+      "stars": 7,
+      "pushed_at": "2026-09-27T18:21:06Z"
+    },
+    {
+      "full_name": "liustack/modlens",
+      "stars": 4051,
+      "pushed_at": "2026-09-27T18:20:41Z"
+    },
+    {
+      "full_name": "HaoyueQin/dsh-usage-statistics-panel",
+      "stars": 12,
+      "pushed_at": "2026-09-27T18:20:27Z"
+    },
+    {
+      "full_name": "Q00/ouroboros",
+      "stars": 6115,
+      "pushed_at": "2026-09-27T18:37:21Z"
+    },
+    {
+      "full_name": "nexu-io/open-design",
+      "stars": 98307,
+      "pushed_at": "2026-09-27T18:18:52Z"
+    },
+    {
+      "full_name": "LivXue/dsh-plugin-shop",
+      "stars": 937,
+      "pushed_at": "2026-09-27T18:17:58Z"
+    },
+    {
+      "full_name": "TZHR-invest/dsh-plugins",
+      "stars": 3,
+      "pushed_at": "2026-09-27T18:17:38Z"
+    }
+  ],
+  "all_total_now": 16374
+}
