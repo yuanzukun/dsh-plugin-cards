@@ -6,6 +6,8 @@
 
 ## 一、官方文档核心结论（开发必须遵守的 8 条）
 
+> ✏️ 2026-09-30：以下基于 0.1.x 文档；**0.2.0 起的官方规则清单（SKILL.md + references 五件）以《0.2.0-官方规则审计与修复方案.md》附录为准**，本文 8 条为开发期底板，冲突处从新。
+
 | # | 规则 | 出处 |
 |---|------|------|
 | 1 | 插件 = 导出 `apply(ctx)` 的 TS 模块，可选 `name` / `inject`；三种形态：函数（推荐）、对象、类（Service） | develop/basic |
@@ -18,6 +20,8 @@
 | 8 | 免构建分发两条路：**npm 发布**（publish 前构建好 `lib/`）或 **tarball**（`pnpm pack`）——首选 npm | publish |
 
 ## 二、社区生态分层与空白点
+
+> ✏️ 2026-09-30：本节数据截至 09-25，此后 5 天 topic 仓 5.5 倍增长且被灌水污染，格局已变天；**最新生态真相源见《插件市场分析-2026-09-30.md》**。另外 awesome 入驻路线已作废（用户决策：市场唯一来源 = github.com/topics/dsh-plugin），见第七节 P4。
 
 | 层 | 代表 | 对本项目的意义 |
 |----|------|---------------|
@@ -33,12 +37,12 @@
 | 决策点 | 建议 | 理由 |
 |--------|------|------|
 | 插件形态 | 函数插件为主；仅当对外提供服务时用 Service 类 | 官方推荐；Service 类抢注册服务名有整树崩溃风险（坑位 13） |
-| 设置卡片 | 导出 `interface Config` + `const Config: Schema = Schema.object({...})`（Schemastery），`apply(ctx, config)` 拿校验后配置 | 官方 config 机制；HMR 热替换无残留 |
+| 设置卡片 | 导出 `interface Config` + `const Config: Schema = Schema.object({...})`（Schemastery），`apply(ctx, config)` 拿校验后配置 | 官方 config 机制；HMR 热替换无残留<br>✏️ **2026-09-30 已演进**：实际落地改为 **plugins.bundle.config 页**（0.2.2 起对齐官方 WebSearchCard 模式：`inject=['locale']` + `ctx.configForms` + form subscribe），Schemastery 方案未采用 |
 | 对话节点 | 注册 `ConversationNodeDefinition` + keyed renderer，从 `session/event` 渲染；持久状态走扩展 `SessionEventMap` | 归属表官方路径 |
 | **所见即所记** | 新增模型可见输入 ⇒ 必须新增对应 `SessionEvent` | 官方不变量，违反则回放/UI 失真 |
 | 构建 | tsdown 专用配置直接转译 `src/`，不做类型检查、不用项目引用（参考官方 turtle-ui） | 保证 git 安装的 `prepare` 自包含 |
 | 分发 | ① npm publish（首选，免构建授权）② tarball 备选 ③ git 安装（需 prepare + allowBuilds，锁 commit `#<sha>`） | publish 文档 |
-| 版本锚定 | **目标锚定上游最新 `dsh-v0.1.7-rc.2`**（2026-09-24 发布）；本机验证双轨：① 源码跑 `pnpm dsh web`（0.1.7-rc.2，主验证环境）② 本机 DSH Desktop 2.0.4 内置运行时仍是 0.1.2-alpha.1，仅作兼容性副验证，待桌面版跟进 0.1.7 后切换 | 上游已到 0.1.7 系列，0.1.2 已落后两代；npm 上 `deepseek-harness` 是占位包，真实版本线在 GitHub Releases |
+| 版本锚定 | **目标锚定上游最新 `dsh-v0.1.7-rc.2`**（2026-09-24 发布）；本机验证双轨：① 源码跑 `pnpm dsh web`（0.1.7-rc.2，主验证环境）② 本机 DSH Desktop 2.0.4 内置运行时仍是 0.1.2-alpha.1，仅作兼容性副验证，待桌面版跟进 0.1.7 后切换 | 上游已到 0.1.7 系列，0.1.2 已落后两代；npm 上 `deepseek-harness` 是占位包，真实版本线在 GitHub Releases<br>✏️ **2026-09-30 已演进**：宿主现行为 **0.2.0-rc.2**（本机桌面端运行时即此版本），主验证环境 = 桌面端本尊；本插件 `dsh.engine` 保持 `>=0.1.7-rc.2` 兼容写法，见第七节 |
 
 ## 四、分阶段实施计划
 
@@ -72,6 +76,8 @@
 ## 五、风险清单（本机实测坑位 + 0.1.7 破坏性变更，开发期就要规避）
 
 ### 0.1.7 系列与本方案直接相关的破坏性变更
+
+> ✏️ 2026-09-30：本表针对 0.1.7，宿主现行为 0.2.0-rc.2，**0.2.0 起的规则与破坏性变更以《0.2.0-官方规则审计与修复方案.md》为准**（如 V4 日志、locale 服务、ui-plugin 规则）。
 
 | 变更 | 对本插件的影响 |
 |------|---------------|
