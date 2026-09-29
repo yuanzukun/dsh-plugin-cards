@@ -2,7 +2,8 @@
 /**
  * 全量抓取 topic:dsh-plugin（Search API 单查询仅返回前 1000 条 → 逐轮收割递归）。
  * 每轮取页 1..10（1000 条），以末位星数为新上界 stars:<=S 递归；同星数堆积无进展时按 pushed 日期中点拆分。
- * --quality 加上与插件一致的质量限定符（★>=3 近 12 月更新 含 dsh），对齐插件实际口径。
+ * --quality 加上与插件一致的质量限定符（★>=0 近 12 月更新 含 dsh），对齐插件实际口径。
+ * 1.1.0（2026-09-30 用户决策）：★>=3 → ★>=0（不限星数），完整覆盖官方 topic 页。
  * 未认证限流 10 次/分钟 → 页间 7s；403/429 退避 65s；按 full_name 去重。
  */
 const fs = require('fs')
@@ -16,10 +17,10 @@ let reqCount = 0
 function searchUrl(bucket, page) {
   let q = TOPIC
   // 同类型限定符在 GitHub Search API 中后者覆盖前者（不取交集）→ 必须合并成单一区间
-  const smin = QUALITY ? 3 : null
+  const smin = QUALITY ? 0 : null // ★>=0 = 不限星数（0 时不发 stars 限定符）
   const smax = bucket.smax != null ? bucket.smax : null
-  if (smin != null && smax != null) q += ' stars:' + smin + '..' + smax
-  else if (smin != null) q += ' stars:>=' + smin
+  if (smin != null && smin > 0 && smax != null) q += ' stars:' + smin + '..' + smax
+  else if (smin != null && smin > 0) q += ' stars:>=' + smin
   else if (smax != null) q += ' stars:<=' + smax
   const qDate = QUALITY ? new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString().slice(0, 10) : null
   const pmin = [qDate, bucket.pmin].filter(Boolean).sort().pop() // 取更晚（更严格）的下界
