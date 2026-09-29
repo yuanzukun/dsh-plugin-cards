@@ -69,7 +69,8 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 
 - 发现条件：`topic:dsh-plugin` + 近 12 个月有更新 + 名称/描述/标签含 `dsh`（★ 不限，完整覆盖官方 topic 页）
 - 分层合规：L1 声明 `dsh.bundle` 才可安装（宿主硬门禁）→ L2 `dsh.engine` 与桌面端 0.2.0-rc.2 semver 兼容（不兼容默认隐藏）→ L3 展示规范三件套（icon/locale/package.json exports）计 0-3 分仅作排序
-- npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认隐藏；宿主本体仓不借星
+- npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认显示（0.9.5 起默认开，可关回官方 topic 纯口径）；宿主本体仓不借星
+- 安装/更新/启停/卸载的生效语义对齐官方：宿主无 HMR 时返回 `restart-required`，界面明确提示「下次启动 DeepSeek Harness 后加载」（桌面端安装后需重启宿主生效，刷新页面无效）
 - 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏
 - 界面文案只显示中文（EN 词典引用 ZH，完整走官方 locale 服务）
 
