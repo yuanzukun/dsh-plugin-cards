@@ -58,10 +58,20 @@ pnpm dsh --profile web --dump-config   # 应出现 "# == dsh-plugin-cards" 层
 ```sh
 # ① bump package.json 版本 → commit → push main
 # ② 打 tag 推送，其余全自动（版本门禁 → build → 语法检查 → lib 漂移守卫 → npm publish → npmmirror sync → GitHub Release）
-git push origin main && git tag v0.8.17 && git push origin v0.8.17
+git push origin main && git tag v0.9.4 && git push origin v0.9.4
 ```
 
 前置：仓库 Secret `NPM_TOKEN`（granular token，勾选 Bypass 2FA for API and CI）。✅ 2026-09-26 已配置并跑通（v0.8.16 起全自动发布）。
+
+## 内置插件市场的数据口径
+
+市场目录**唯一来源**为官方社区仓库 [github.com/topics/dsh-plugin](https://github.com/topics/dsh-plugin)：
+
+- 发现条件：`topic:dsh-plugin` + 近 12 个月有更新 + 名称/描述/标签含 `dsh`（★ 不限，完整覆盖官方 topic 页）
+- 分层合规：L1 声明 `dsh.bundle` 才可安装（宿主硬门禁）→ L2 `dsh.engine` 与桌面端 0.2.0-rc.2 semver 兼容（不兼容默认隐藏）→ L3 展示规范三件套（icon/locale/package.json exports）计 0-3 分仅作排序
+- npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认隐藏；宿主本体仓不借星
+- 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏
+- 界面文案只显示中文（EN 词典引用 ZH，完整走官方 locale 服务）
 
 ## License
 
