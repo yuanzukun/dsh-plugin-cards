@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- dsh-plugin-cards icon: stacked settings card + chat node (artwork: literal colors allowed) -->
+  <rect x="8" y="16" width="40" height="28" rx="6" fill="#2f6fed"/>
+  <rect x="16" y="24" width="40" height="28" rx="6" fill="#eef1f6" stroke="#d4d9e0" stroke-width="2"/>
+  <circle cx="26" cy="34" r="4" fill="#2f6fed"/>
+  <rect x="34" y="31" width="16" height="3" rx="1.5" fill="#8a8f99"/>
+  <rect x="22" y="43" width="28" height="3" rx="1.5" fill="#c3cad4"/>
+</svg>

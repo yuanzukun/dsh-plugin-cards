@@ -44,17 +44,14 @@ pnpm dsh --profile web --dump-config   # 应出现 "# == dsh-plugin-cards" 层
 
 更新同样在市场内完成：已安装插件有新版本时卡片显示「有更新」，一键升级。
 
-> 命令行备选（CI / 无头环境 / 桌面端管理员）：
+> 命令行备选（CI / 无头环境）：
 > ```sh
 > dsh plugin --profile desktop add dsh-plugin-cards    # 桌面端固定用 desktop profile
 > dsh plugin --profile <name>  add dsh-plugin-cards    # 其他 profile（web 等）
 > ```
 >
-> 桌面端命令安装要点：
-> - Home 不用设置：CLI 与桌面端默认都用 `~/.dsh`（即 `C:\Users\<你>\.dsh`），`dsh plugin add` 直接写进 `~/.dsh/profiles/desktop`，装完**重启桌面端**生效
-> - `dsh` 命令来源：deepseek-harness 源码 checkout 根目录执行 `pnpm dsh plugin ...`（本机无全局 dsh）
-> - ⚠️ 必须用与桌面端一致的 pnpm（v12），旧 pnpm 重建 modules 会假成功
-> - ⚠️ 若 npm 装到的版本偏旧，多为 pnpm metadata 缓存陈旧，删除 `%LOCALAPPDATA%/pnpm-cache/v11/metadata/registry.npmjs.org/dsh-plugin-cards.jsonl` 后重试
+> - ✅ **dsh 0.2.0+**：桌面端菜单栏「Manage dsh command」可内置 dsh 命令并管理插件，**无需另装 Node / pnpm**（官方 0.2.0-rc.2 起）；`dsh` 已在 PATH 时 CLI 与桌面端默认都用 `~/.dsh`，装完重启桌面端生效
+> - ⚠️ 以下为 **0.1.x 旧版用户**备注：`dsh` 命令需在 deepseek-harness 源码 checkout 根目录执行 `pnpm dsh plugin ...`（本机无全局 dsh）；必须用与桌面端一致的 pnpm（v12），旧 pnpm 重建 modules 会假成功；若 npm 装到偏旧版本，多为 pnpm metadata 缓存陈旧，删除 `%LOCALAPPDATA%/pnpm-cache/v11/metadata/registry.npmjs.org/dsh-plugin-cards.jsonl` 后重试
 
 ## 发布（tag 流水线）
 

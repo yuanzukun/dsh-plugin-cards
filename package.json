@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-cards",
-  "version": "0.8.24",
+  "version": "0.8.25",
   "description": "DeepSeek Harness (dsh) 设置卡片 + 对话节点插件",
   "license": "MIT",
   "author": "yuanzukun",
@@ -18,15 +18,20 @@
     "settings-card",
     "conversation-node"
   ],
+  "icon": "./icon.svg",
   "type": "module",
   "main": "lib/index.js",
   "files": [
     "lib",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
   ],
   "exports": {
     ".": "./lib/index.js",
-    "./client": "./lib/client.js"
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "scripts": {
     "build": "tsdown && node -e \"require('fs').accessSync('lib/client.js'); console.log('client.js present OK')\"",
