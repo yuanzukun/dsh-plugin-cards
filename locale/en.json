@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Plugin Cards",
-    "description": "Settings cards, conversation annotation nodes and a community plugin market for DeepSeek Harness (dsh)."
+    "title": "设置卡片 + 对话节点 + 插件市场",
+    "description": "DeepSeek Harness (dsh) 插件：插件详情页设置卡片、对话注记节点与社区插件市场（聚合/搜索/一键安装）。"
   }
 }
