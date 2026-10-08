@@ -43,6 +43,10 @@ jobs:
       - name: Syntax check client bundle
         run: node --check lib/client.js
 
+      # 客户端冒烟门禁：模拟宿主环境调用 apply，断言对话节点/槽位注册齐全（失败即阻断发布）
+      - name: Client apply smoke (simulate-client-apply)
+        run: node scripts/simulate-client-apply.cjs
+
       # 产物一致性守卫：git 安装的用户直接用仓库里的 lib/，必须与 src 构建输出一致（防 src 改了 lib 忘提交）
       - name: Guard committed lib/ matches build output
         run: |
