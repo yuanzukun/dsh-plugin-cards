@@ -115,13 +115,14 @@
 | P0 脚手架与调试通路 | ✅ 完成 | `--patch` 调试通路 + `--dump-config` 验证按原方案落地；主验证环境后来切换为本机 DSH Desktop 0.2.0-rc.2 本尊（宿主已升级） |
 | P1 设置卡片 | ✅ 完成 | 后演进为 plugins.bundle.config 页（0.2.2 对齐官方 WebSearchCard 模式），0.9.3 起分 3 组 |
 | P2 对话节点 | ✅ 完成 | 所见即所记走 `user/message` 事件，0.9.4 色条胶囊容器 |
-| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.7 |
+| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.8（流水线新增客户端冒烟门禁） |
 | P4 生态入驻 | ⚠️ 部分变更 | dsh-plugin-hub 聚合页 ✅ 已建并每日构建；**awesome-dsh-plugin PR 作废**（用户决策 2026-09-30：市场唯一来源 = github.com/topics/dsh-plugin，不做外部渠道收录） |
 
 ### 立项后新增的能力（原方案未预见）
 
 - **内置插件市场**（0.3.0 起萌芽，0.8.x 成型，0.9.1-0.9.2 分层合规，0.9.6 安装进度卡片化 + 安装队列，0.9.7 pnpm 24h 冷却拦截友好化）：发现/搜索/分类/一键安装/更新检测/已安装管理/自定义安装/批量排队安装（串行执行，失败暂停）；安装全程有进度卡片（步骤条 + pnpm 计数人读化 + 结果卡片/失败重试）；数据口径见 README「内置插件市场的数据口径」节
 - **pnpm 11 供应链冷却应对**（0.9.7）：桌面端内置 pnpm 11.7.0 默认 `minimum-release-age=24h`，卸载/更新会重校验整个 lockfile 且 exclude 豁免不生效（pnpm 11 设计缺口，temp 副本实测）→ 客户端检测 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` 给原因 + 自救指引（profile yaml 加 `minimumReleaseAge: 0`）；根治需上游（官方 plugin-manager 或 pnpm）处理
+- **出厂快照裁剪 + 冒烟门禁**（0.9.8）：发版内联快照由全量 10607 条（≈5MB，npm 包 5.19MB）改为按星 Top 1500 + npm-only 可安装 100（client.js 0.91MB，npm 包约 1.1MB），完整目录仍由 hub 快照/官方源同步/静默收割在线补齐；simulate-client-apply.cjs 重写为可运行冒烟（内置 react stub + 注册点断言）并纳入 release.yml 门禁；locale meta.title 修复为插件名（宿主规则 meta.title ?? 包名，口号归 description），en 词典与 zh 分写
 - **locale 服务接入**（0.9.0）：对齐官方 `dsh-client-locale`；0.9.2 起只显示中文（EN 词典引用 ZH）
 - **主题 token 化**（0.9.0）：全部引用宿主 `--dsw-alias-*`（0.2.0-rc.2 运行宿主 asar 取证 120 token）
 - **上游快照链路**（dsh-plugin-hub）：每日两次构建 + 出厂快照内联（inject-snapshot.cjs）
