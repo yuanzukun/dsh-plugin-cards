@@ -13,7 +13,7 @@ DeepSeek Harness (dsh) 插件：**设置卡片 + 对话节点 + 插件市场**�
 ├── src/index.ts           # 插件入口（tsdown 只编译此文件 → lib/index.js）
 ├── lib/                   # lib/index.js（编译产物）+ lib/client.js（手写客户端，勿手改 tsdown 配置外清理）
 ├── assets/                # cards-snapshot.json 快照原料（inject-snapshot 注入进 client.js 成出厂快照）
-├── scripts/               # verify-*.cjs 版本验证脚本 + inject-snapshot.cjs 注入工具
+├── scripts/               # 工具脚本：inject-snapshot.cjs 出厂快照注入 + simulate-client-apply.cjs 客户端冒烟（CI 门禁）+ fetch-all-dsh.cjs 官方源收割复算等
 ├── .github/workflows/     # release.yml：tag 触发的全自动发布流水线
 ├── tsdown.config.ts       # 构建（esm → lib/，clean:false 保护手写 client.js）
 └── docs/                  # 开发建议方案
