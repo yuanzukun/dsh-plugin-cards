@@ -115,7 +115,7 @@
 | P0 脚手架与调试通路 | ✅ 完成 | `--patch` 调试通路 + `--dump-config` 验证按原方案落地；主验证环境后来切换为本机 DSH Desktop 0.2.0-rc.2 本尊（宿主已升级） |
 | P1 设置卡片 | ✅ 完成 | 后演进为 plugins.bundle.config 页（0.2.2 对齐官方 WebSearchCard 模式），0.9.3 起分 3 组 |
 | P2 对话节点 | ✅ 完成 | 所见即所记走 `user/message` 事件，0.9.4 色条胶囊容器 |
-| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.14（中文化收尾：出厂快照 zh 回填 + 中文搜索 + 未翻译重试） |
+| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.15（列表视图标题重叠修复） |
 | P4 生态入驻 | ⚠️ 部分变更 | dsh-plugin-hub 聚合页 ✅ 已建并每日构建；**awesome-dsh-plugin PR 作废**（用户决策 2026-09-30：市场唯一来源 = github.com/topics/dsh-plugin，不做外部渠道收录） |
 
 ### 立项后新增的能力（原方案未预见）
@@ -140,3 +140,5 @@
 ### 已修复问题索引
 
 0.2.0 规则审计 6 项（A 主题 token / B 元数据 / C locale / D 回归 / E 剪贴板 / F README）+ 引擎判定 bug + UI 美化 7 项 + P0 均已关闭；原文《0.2.0-官方规则审计与修复方案.md》于 2026-09-30 删除，仅保留此结论。
+
+- **列表视图标题重叠**（0.9.15 修复）：0.9.13 双行头部重构把 `.dcards-name` 从 head 的 flex 子项（自动块化，overflow/ellipsis 有效）移入 `namewrap` 普通块容器内变行内元素——CSS 裁剪属性对行内元素不生效，`white-space:nowrap` 长名横向溢出画到 ★ 星数与相邻描述列（列表视图行窄先暴露，网格视图长名同样中招）；修复 = `.dcards-name` 补 `display:block`。真机 DOM 断言：列表视图 50 个标题 overflowing 0。
