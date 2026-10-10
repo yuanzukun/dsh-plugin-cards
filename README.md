@@ -71,6 +71,7 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 - 分层合规：L1 声明 `dsh.bundle` 才可安装（宿主硬门禁）→ L2 `dsh.engine` 与桌面端 0.2.0-rc.2 semver 兼容（不兼容默认隐藏）→ L3 展示规范三件套（icon/locale/package.json exports）计 0-3 分仅作排序
 - 目录按 GitHub 仓库身份（`full_name`）去重（0.9.10）：同一仓库被多个 npm 镜像/抢注包回挂时收敛为一条（npm-only 条目按包名天然唯一）；保留优先级 可安装 > npm 名与仓库名一致 > 展示合规分 > 星数 > 来源 both>github>npm
 - 描述中文优先级（0.9.10）：快照自带 `description_zh`（hub 侧 LLM 预翻译，就绪后离线也全中文）> 运行时翻译（LLM 批量 → MyMemory 兜底）> 原文
+- 二级分类（0.9.11）：六个大类（智能体与技能/界面与桌面/记忆与知识/工具与自动化/框架与宿主集成/模型与多模态）选中后浮出子类 chips 行，与父类 AND 过滤、精确计数；分类兜底阶段 `dsh-`/`dsh_` 名称前缀归入框架与宿主集成，「其他」长尾实测 682 → 56 条
 - npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认显示（0.9.5 起默认开，可关回官方 topic 纯口径）；宿主本体仓不借星
 - 安装/更新/启停/卸载的生效语义对齐官方：宿主无 HMR 时返回 `restart-required`，界面明确提示「下次启动 DeepSeek Harness 后加载」（桌面端安装后需重启宿主生效，刷新页面无效）
 - 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏（**0.9.8 起按星裁剪：GitHub/both Top 1500 + npm-only 可安装 100，约 0.8MB；完整目录打开市场后由在线链路自动补齐**，裁剪参数见 `scripts/inject-snapshot.cjs --keep/--npm-keep`）

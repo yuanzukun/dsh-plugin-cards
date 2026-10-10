@@ -115,7 +115,7 @@
 | P0 脚手架与调试通路 | ✅ 完成 | `--patch` 调试通路 + `--dump-config` 验证按原方案落地；主验证环境后来切换为本机 DSH Desktop 0.2.0-rc.2 本尊（宿主已升级） |
 | P1 设置卡片 | ✅ 完成 | 后演进为 plugins.bundle.config 页（0.2.2 对齐官方 WebSearchCard 模式），0.9.3 起分 3 组 |
 | P2 对话节点 | ✅ 完成 | 所见即所记走 `user/message` 事件，0.9.4 色条胶囊容器 |
-| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.10（流水线新增客户端冒烟门禁） |
+| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.11（流水线新增客户端冒烟门禁） |
 | P4 生态入驻 | ⚠️ 部分变更 | dsh-plugin-hub 聚合页 ✅ 已建并每日构建；**awesome-dsh-plugin PR 作废**（用户决策 2026-09-30：市场唯一来源 = github.com/topics/dsh-plugin，不做外部渠道收录） |
 
 ### 立项后新增的能力（原方案未预见）
@@ -125,6 +125,7 @@
 - **出厂快照裁剪 + 冒烟门禁**（0.9.8）：发版内联快照由全量 10607 条（≈5MB，npm 包 5.19MB）改为按星 Top 1500 + npm-only 可安装 100（client.js 0.91MB，npm 包约 1.1MB），完整目录仍由 hub 快照/官方源同步/静默收割在线补齐；simulate-client-apply.cjs 重写为可运行冒烟（内置 react stub + 注册点断言）并纳入 release.yml 门禁；locale meta.title 修复为插件名（宿主规则 meta.title ?? 包名，口号归 description），en 词典与 zh 分写
 - **市场说明文案结构化**（0.9.8/0.9.9）：说明长文统一为「加粗标签 + 说明」卡片列表（noteUl 助手按全角冒号切分 + .dcards-note token 化样式），并按 Tab 归属拆分——market 目录口径/安装确认、installed 管理/构建/生效、custom 三种来源、settings 数据源明细，各页只显示自己的说明
 - **目录去重 + 描述中文化前置 + 排版修复**（0.9.10）：① hub 快照内同一 GitHub 仓库被多个 npm 镜像/抢注包回挂（实测 dsh-market/dsh-market 同名 4 条、全量收敛 2704 条重复），catIdxFromSnapshot 按 full_name 去重（npm-only 按 npm 名），保留优先级 可安装>npm名与仓库名一致>ms>stars>both>github>npm（确定性）；② 卡片描述读取快照 `description_zh` 字段（hub 侧 LLM 预翻译，字段就绪即全量中文，运行时翻译降级为兜底）；③ 排版：分类 chips 自适应排列（紧凑 11px 变体 + 自动换行铺满行宽 +「全部」恒居首其余按条数降序自动排，弃横滚方案）、desc 区 min-height 54px 齐底、描述连续「\|」分隔符清洗为「·」、scope 说明第 2 行去掉行首「；」；CATIDX_RULES_VER → 6（旧索引缓存自动失效）
+- **二级分类 + 漏斗修补**（0.9.11）：① 六个大类（≥300 条）配子类——智能体与技能（多智能体/技能包/提示词与角色扮演/智能体框架）、界面与桌面（桌宠与桌面应用/可视化与侧边栏/移动端/Web 界面）、记忆与知识（长期记忆/RAG 与知识库/联网搜索）、工具与自动化（MCP 服务器/科研与写作/终端与 CLI/效率与账单）、框架与宿主集成（DSH 生态/Cordis 生态/其他宿主/通用集成）、模型与多模态（图像与视觉/语音与识别/供应商与用量）；子类 chips 仅在选中父类后浮出一行（与父类 AND 过滤，换父类重置，取消即收起），精确计数随索引现算，子类 topics 优先 kw 兜底首中即止 + catchall 承接；② 漏斗修补：classifyItem 兜底阶段补 `dsh-`/`dsh_` 名称前缀 → 框架与宿主集成、`dsh-plugin-market` topic 移交合集与市场，实测「其他」682 → 56 条；CATIDX_RULES_VER → 7
 - **locale 服务接入**（0.9.0）：对齐官方 `dsh-client-locale`；0.9.2 起只显示中文（EN 词典引用 ZH）
 - **主题 token 化**（0.9.0）：全部引用宿主 `--dsw-alias-*`（0.2.0-rc.2 运行宿主 asar 取证 120 token）
 - **上游快照链路**（dsh-plugin-hub）：每日两次构建 + 出厂快照内联（inject-snapshot.cjs）
