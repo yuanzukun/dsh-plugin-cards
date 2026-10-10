@@ -9,6 +9,13 @@
 - 用户指令的边界必须严格遵守：例如「推送」只授权 push 本身，**不授权**打 tag、触发发布等衍生操作。
 - tag 必须**逐个 push**（2026-10-10 实测：单次 push 超过 3 个 tag 会丢失 GitHub Actions 触发事件，release 流水线零运行）。
 
+## dsh-plugin-hub 数据管线约定（2026-10-11）
+
+- **全量快照重建默认走 CI**（github.com/yuanzukun/dsh-plugin-hub 的 daily-snapshot workflow，自带 GITHUB_TOKEN、超时 180 分钟）；本地只跑 `--skip-probe` 快速调试或小规模验证。本机无 token，未认证限额下全量收割要 4-5 小时（2026-10-11 实测踩坑 4h51m 后中止）。
+- **快照数据可自行推送**（用户 2026-10-11 授权）：hub 仓库的快照产物与数据缓存（`public/cards-snapshot.json`、`data/*.json`）的 commit + push **无需等待用户指令**；功能性代码改动仍按上方 Git 纪律等指令。
+- workflow 带 push 触发（paths: `scripts/**`、`fetch.mjs`、workflow 自身；CI 自提交 data/* 与 public/* 因路径过滤不会自触发，防死循环）。
+- gh CLI keyring 凭证已失效（401，未恢复）：触发 CI 走 push 触发器，监控走未认证 runs API（公开仓库可用，拉日志不行）。
+
 ## 验证与预览约定（2026-10-10）
 
 - 真机验证**不要产出截图 png 文件**：不用 playwright screenshot 落盘。验证用 snapshot / DOM 断言，结果通过保持 dev server 连接 + 刷新让用户在线查看（`dsh web` → 内置浏览器预览）。
