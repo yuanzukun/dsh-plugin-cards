@@ -115,7 +115,7 @@
 | P0 脚手架与调试通路 | ✅ 完成 | `--patch` 调试通路 + `--dump-config` 验证按原方案落地；主验证环境后来切换为本机 DSH Desktop 0.2.0-rc.2 本尊（宿主已升级） |
 | P1 设置卡片 | ✅ 完成 | 后演进为 plugins.bundle.config 页（0.2.2 对齐官方 WebSearchCard 模式），0.9.3 起分 3 组 |
 | P2 对话节点 | ✅ 完成 | 所见即所记走 `user/message` 事件，0.9.4 色条胶囊容器 |
-| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.13（市场卡片视觉跃升：分类色左条/双行头部/大头像/色点徽章/语义色安装钮；修 vv 双前缀） |
+| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.14（中文化收尾：出厂快照 zh 回填 + 中文搜索 + 未翻译重试） |
 | P4 生态入驻 | ⚠️ 部分变更 | dsh-plugin-hub 聚合页 ✅ 已建并每日构建；**awesome-dsh-plugin PR 作废**（用户决策 2026-09-30：市场唯一来源 = github.com/topics/dsh-plugin，不做外部渠道收录） |
 
 ### 立项后新增的能力（原方案未预见）
@@ -127,6 +127,8 @@
 - **目录去重 + 描述中文化前置 + 排版修复**（0.9.10）：① hub 快照内同一 GitHub 仓库被多个 npm 镜像/抢注包回挂（实测 dsh-market/dsh-market 同名 4 条、全量收敛 2704 条重复），catIdxFromSnapshot 按 full_name 去重（npm-only 按 npm 名），保留优先级 可安装>npm名与仓库名一致>ms>stars>both>github>npm（确定性）；② 卡片描述读取快照 `description_zh` 字段（hub 侧 LLM 预翻译，字段就绪即全量中文，运行时翻译降级为兜底）；③ 排版：分类 chips 自适应排列（紧凑 11px 变体 + 自动换行铺满行宽 +「全部」恒居首其余按条数降序自动排，弃横滚方案）、desc 区 min-height 54px 齐底、描述连续「\|」分隔符清洗为「·」、scope 说明第 2 行去掉行首「；」；CATIDX_RULES_VER → 6（旧索引缓存自动失效）
 - **二级分类 + 漏斗修补**（0.9.11）：① 六个大类（≥300 条）配子类——智能体与技能（多智能体/技能包/提示词与角色扮演/智能体框架）、界面与桌面（桌宠与桌面应用/可视化与侧边栏/移动端/Web 界面）、记忆与知识（长期记忆/RAG 与知识库/联网搜索）、工具与自动化（MCP 服务器/科研与写作/终端与 CLI/效率与邮件）、框架与宿主集成（DSH 生态/Cordis 生态/其他宿主/通用集成）、模型与多模态（图像与视觉/语音与识别/供应商与用量）；子类 chips 仅在选中父类后浮出一行（与父类 AND 过滤，换父类重置，取消即收起），精确计数随索引现算，子类 topics 优先 kw 兜底首中即止 + catchall 承接；② 漏斗修补：classifyItem 兜底阶段补 `dsh-`/`dsh_` 名称前缀 → 框架与宿主集成、`dsh-plugin-market` topic 移交合集与市场，实测「其他」682 → 56 条；③ 准确率调优（8071 条抽样审计）：移除过泛 kw（界面的 web/desktop/桌面/便签、记忆的搜索、模型的视觉、数据的 session/会话、工具的计费→移交模型·供应商与用量）、合集与市场 kw 收窄（market→插件市场，修复股票行情包误入）、主题与外观前移到框架之前（修复皮肤命中 harness kw 误入框架）、name 含 dsh-market 恒归合集与市场、数据与安全/主题与外观补子类（数据库与备份/通知/安全与审计；皮肤/表情与贴纸/图标与字体/主题）；CATIDX_RULES_VER → 7
 - **市场页面布局美化**（0.9.12，对照社区市场类插件惯例 + 官方 practices.md）：① P0 徽章降噪（官方徽章描边化、版本徽章降为弱化文本、分类色徽章保留）+ 搜索行控件高度统一 26px + scope 说明两行并一行（完整说明收进 title tooltip，省 ~34px 纵向）+ 480px 以下单列响应式（根治 220px 双列小卡头部折行）+ 骨架高度 98→130 对齐实卡消跳变 + asar 取证宿主无 shadow token（hover 阴影保留字面 rgba 唯一例外）；② P1 Tabs+搜索行吸顶（sticky，滚动容器不符时自动退化）+ 安装/更新按钮下移卡片底部操作行（头部折行根治）+ 警示徽章图形化（⚠ 引擎不符 / 🚫 不可安装）；③ P2 网格/列表双视图切换（localStorage 记忆）+ 增量渲染（先渲 60 条，「加载更多」每次 +60，翻页/筛选变化键化重置）。截图验证：网格/列表两视图 + console 0 错误 0 警告
+- **市场卡片视觉跃升**（0.9.13）：分类色左条(3px) / 双行头部（短名主 + owner·更新时间副，★ 右上）/ 38px 分类色实底圆角头像 / 分类 pill→色点+文字（入底部操作行）/ 安装·更新钮分类色实底 / desc 行高 19px / 骨架 150px；顺带修复版本 vv 双前缀（render 'v'+ver 而 ver 已含 v）
+- **中文化收尾**（0.9.14，P0/P1）：① 出厂快照重注入——hub 侧 agnes-2.5-flash 回填 7007 条 `description_zh`（tx-cache 7690 条唯一译文）后 inject-snapshot，离线首屏 zh 覆盖 0 → 814/1600（50.9%，其余多为中文原文条目）；② 搜索域纳入 descZh——`matchQuery` haystack 由 spec+description 扩为 +descZh，中文关键词可命中英文描述插件（真机验证「备份」命中纯英文原文条目）；③ 未翻译可见化——工具行新增「⚠ {n} 条未翻译」弱提示 chip（本页口径：英文描述且无 hub 译文/缓存/在途翻译），点击重置 LLM/MyMemory「本轮停用」标记并重跑翻译 effect（txRetryTick 依赖），翻译失败不再纯静默；④ 原计划的长描述翻译放开经核实为死代码（compactItem 已把 description 截 500，`d.length > TX_MAX_LEN` 永不触发），未改码
 - **locale 服务接入**（0.9.0）：对齐官方 `dsh-client-locale`；0.9.2 起只显示中文（EN 词典引用 ZH）
 - **主题 token 化**（0.9.0）：全部引用宿主 `--dsw-alias-*`（0.2.0-rc.2 运行宿主 asar 取证 120 token）
 - **上游快照链路**（dsh-plugin-hub）：每日两次构建 + 出厂快照内联（inject-snapshot.cjs）
