@@ -3,6 +3,7 @@ lib/*
 !lib/client.js
 !lib/index.js
 *.log
+.playwright-cli/
 .DS_Store
 .workbuddy/
 *.tgz
