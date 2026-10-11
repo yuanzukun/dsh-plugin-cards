@@ -5,31 +5,25 @@
  * --quality 加上与插件一致的质量限定符（★>=0 近 12 月更新 含 dsh），对齐插件实际口径。
  * 1.1.0（2026-09-30 用户决策）：★>=3 → ★>=0（不限星数），完整覆盖官方 topic 页。
  * 未认证限流 10 次/分钟 → 页间 7s；403/429 退避 65s；按 full_name 去重。
+ *
+ * 2026-10-11 合一：搜索 URL 构造唯一实现 = 客户端 buildSearchUrl（经 load-client-pure.cjs
+ * 拼接装载 src/client/{10-runtime,30-market-pure}.js）。此前本脚本与 client.js 各有一份
+ * searchUrl/buildSearchUrl——0.9.17/18 的分桶二分修复正是双实现漂移所致，此处根治。
+ * 客户端实现为超集（含 0.9.18 created 维度拆分），本脚本自动随其升级。
  */
 const fs = require('fs')
 const path = require('path')
+const { loadPure } = require('./load-client-pure.cjs')
+const pure = loadPure()
 const OUT = path.join(__dirname, 'dsh-all.json')
-const TOPIC = 'topic:dsh-plugin'
+const TOPIC = 'dsh-plugin' // buildSearchUrl 参数为 topic 名（内部自行拼 topic: 前缀）
 const QUALITY = process.argv.includes('--quality')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let reqCount = 0
 
 function searchUrl(bucket, page) {
-  let q = TOPIC
-  // 同类型限定符在 GitHub Search API 中后者覆盖前者（不取交集）→ 必须合并成单一区间
-  const smin = QUALITY ? 0 : null // ★>=0 = 不限星数（0 时不发 stars 限定符）
-  const smax = bucket.smax != null ? bucket.smax : null
-  if (smin != null && smin > 0 && smax != null) q += ' stars:' + smin + '..' + smax
-  else if (smin != null && smin > 0) q += ' stars:>=' + smin
-  else if (smax != null) q += ' stars:<=' + smax
-  const qDate = QUALITY ? new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString().slice(0, 10) : null
-  const pmin = [qDate, bucket.pmin].filter(Boolean).sort().pop() // 取更晚（更严格）的下界
-  const pmax = bucket.pmax || null
-  if (pmin && pmax) q += ' pushed:' + pmin + '..' + pmax
-  else if (pmin) q += ' pushed:>=' + pmin
-  else if (pmax) q += ' pushed:<' + pmax
-  if (QUALITY) q += ' dsh in:name,description,topics'
-  return `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=100&page=${page}`
+  // 旧实现（已删）：本文件私有 searchUrl —— 与 client.js buildSearchUrl 双实现漂移 0.9.17/18 踩坑
+  return pure.buildSearchUrl(TOPIC, page, QUALITY, 100, 'stars', bucket)
 }
 
 async function api(url, attempt = 0) {

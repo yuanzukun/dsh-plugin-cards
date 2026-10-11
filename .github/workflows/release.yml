@@ -43,6 +43,10 @@ jobs:
       - name: Syntax check client bundle
         run: node --check lib/client.js
 
+      # 纯逻辑单测门禁（node:test 零依赖，2026-10-11 接入）：分类/去重/版本比较/搜索URL/翻译辅助等
+      - name: Unit tests (node:test)
+        run: pnpm test
+
       # 客户端冒烟门禁：模拟宿主环境调用 apply，断言对话节点/槽位注册齐全（失败即阻断发布）
       - name: Client apply smoke (simulate-client-apply)
         run: node scripts/simulate-client-apply.cjs

@@ -11,11 +11,13 @@ DeepSeek Harness (dsh) 插件：**设置卡片 + 对话节点 + 插件市场**�
 ├── cordis.patch.yml       # 发布形态 patch（按包名引用）
 ├── cordis.dev.patch.yml   # 本地调试 patch（绝对路径，勿随包发布）
 ├── src/index.ts           # 插件入口（tsdown 只编译此文件 → lib/index.js）
-├── lib/                   # lib/index.js（编译产物）+ lib/client.js（手写客户端，勿手改 tsdown 配置外清理）
-├── assets/                # cards-snapshot.json 快照原料（inject-snapshot 注入进 client.js 成出厂快照）
-├── scripts/               # 工具脚本：inject-snapshot.cjs 出厂快照注入 + simulate-client-apply.cjs 客户端冒烟（CI 门禁）+ fetch-all-dsh.cjs 官方源收割复算等
+├── src/client/            # 客户端源码真相源（按域分块：00-wrapper/10-runtime/20-node-ui/30-market-pure/40-market-helpers/80-market-section/99-apply）
+├── lib/                   # 纯产物：lib/index.js（编译）+ lib/client.js（assemble-client.cjs 分块拼接组装）
+├── assets/                # cards-snapshot.json 快照原料（assemble-client 裁剪后注入 lib/client.js 成出厂快照）
+├── scripts/               # 工具脚本：assemble-client.cjs 组装 + load-client-pure.cjs 纯逻辑装载（测试/脚本共用）+ simulate-client-apply.cjs 客户端冒烟（CI 门禁）+ fetch-all-dsh.cjs 官方源收割复算（URL 构造与客户端同源）等
+├── tests/                 # 纯逻辑单测（node:test 零依赖，pnpm test；已接入 release.yml 门禁）
 ├── .github/workflows/     # release.yml：tag 触发的全自动发布流水线
-├── tsdown.config.ts       # 构建（esm → lib/，clean:false 保护手写 client.js）
+├── tsdown.config.ts       # 构建（esm → lib/，clean:true；client.js 由组装步骤在清空后重建）
 └── docs/                  # 开发建议方案
 ```
 
@@ -75,7 +77,7 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 - 二级分类（0.9.11）：六个大类（智能体与技能/界面与桌面/记忆与知识/工具与自动化/框架与宿主集成/模型与多模态）选中后浮出子类 chips 行，与父类 AND 过滤、精确计数；分类兜底阶段 `dsh-`/`dsh_` 名称前缀归入框架与宿主集成，「其他」长尾实测 682 → 56 条
 - npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认显示（0.9.5 起默认开，可关回官方 topic 纯口径）；宿主本体仓不借星
 - 安装/更新/启停/卸载的生效语义对齐官方：宿主无 HMR 时返回 `restart-required`，界面明确提示「下次启动 DeepSeek Harness 后加载」（桌面端安装后需重启宿主生效，刷新页面无效）
-- 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏（**0.9.8 起按星裁剪：GitHub/both Top 1500 + npm-only 可安装 100，约 0.8MB；完整目录打开市场后由在线链路自动补齐**，裁剪参数见 `scripts/inject-snapshot.cjs --keep/--npm-keep`）
+- 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏（**0.9.8 起按星裁剪：GitHub/both Top 1500 + npm-only 可安装 100，约 0.8MB；完整目录打开市场后由在线链路自动补齐**，裁剪参数见 `scripts/assemble-client.cjs --keep/--npm-keep`）
 - 界面文案只显示中文（EN 词典引用 ZH，完整走官方 locale 服务）
 
 ## License

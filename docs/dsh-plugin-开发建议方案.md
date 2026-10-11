@@ -132,6 +132,7 @@
 - **locale 服务接入**（0.9.0）：对齐官方 `dsh-client-locale`；0.9.2 起只显示中文（EN 词典引用 ZH）
 - **主题 token 化**（0.9.0）：全部引用宿主 `--dsw-alias-*`（0.2.0-rc.2 运行宿主 asar 取证 120 token）
 - **上游快照链路**（dsh-plugin-hub）：每日两次构建 + 出厂快照内联（inject-snapshot.cjs）
+  - ✏️ 0.9.18 后两轮重构：① inject-snapshot.cjs 退役 → **scripts/assemble-client.cjs**（pnpm build 时组装 lib/client.js，tsdown `clean:false` 补丁移除改 `clean:true`）；② 客户端源码真相源分块至 **src/client/**（00-wrapper/10-runtime/20-node-ui/30-market-pure/40-market-helpers/80-market-section/99-apply，按序 `\n` 拼接），30 块为市场纯逻辑（含 Node 测试出口），40 块为无状态分类/样式辅助（自 createCommunitySection 外提：matchCat/chipStyle/catChipStyle/cliCmdFor/tabStyle）；新增 **tests/pure.test.mjs**（node:test 34 例，pnpm test，已接入 release.yml 门禁）；fetch-all-dsh.cjs 搜索 URL 构造与客户端合一（根治 0.9.17/18 双实现漂移）。历史条目中的 inject-snapshot / 单文件 client.js 字样均指旧形态
 
 ### 版本锚定演进
 
