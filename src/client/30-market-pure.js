@@ -1,7 +1,9 @@
 var SECTION_WRAP = { padding: '8px 0', fontSize: '13px', color: 'var(--dsw-alias-label-primary)' }
 var META_STYLE = { fontSize: '12px', color: 'var(--dsw-alias-label-tertiary)' }
 var BTN_STYLE = {
-  padding: '4px 14px', borderRadius: '6px', border: 'none',
+  // 0.9.28 UI 巡检：border 'none'→'1px solid transparent'——此前实底钮 24px vs ghost 26px（1px 实边框）
+  // 混排不齐；透明边框补齐盒模型后实底/ghost/disabled 三态统一 26px。
+  padding: '4px 14px', borderRadius: '6px', border: '1px solid transparent',
   background: 'var(--dsw-alias-brand-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: '12px', cursor: 'pointer',
 }
 var BTN_GHOST_STYLE = {
@@ -62,7 +64,10 @@ var MARKET_CSS = [
   '.dcards-filterbar{background:var(--dsw-alias-bg-layer-2);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:8px;}',
   '.dcards-chiprow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
   '.dcards-chiprow.dcats-collapsed{max-height:30px;overflow:hidden;}', // 0.9.23：分类行默认单行折叠（30px≈单行 chip 高），「更多 ▾」展开全量——首屏卡片前移 ~46px（真机审计②：2 行 69px 常驻 + 子类 44px）
-  '.dcards-morebtn{flex:0 0 auto;padding:1px 8px;border-radius:11px;font-size:11px;cursor:pointer;border:1px dashed var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);white-space:nowrap;}', // 0.9.23：折叠切换钮（虚线弱化，区别于实体 chip）
+  '.dcards-morebtn{flex:0 0 auto;padding:2px 8px;height:26px;box-sizing:border-box;border-radius:11px;font-size:12px;cursor:pointer;border:1px dashed var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);white-space:nowrap;}', // 0.9.28 UI 巡检：折叠切换钮定高 26px 与 chip 基准对齐（原 1px/11px → 19px 偏矮）
+  // 0.9.28 UI 巡检：Tab 行右侧同步组（📅 时间 + 同步快照 + 官方源同步）整体 298px 不可收缩，
+  // 窄面板（460~520px 实测）右缘溢出到 534px 压过面板边——允许组内换行 + 不超出父容器宽度。
+  '.dcards-tabsright{flex-wrap:wrap;row-gap:4px;max-width:100%;min-width:0;}',
   '.dcards-chiprow>button{white-space:nowrap;flex:0 0 auto;}',
   '.dcards-chiprow.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;}',
   '.dcards-chiprow.scroll>button{flex:0 0 auto;}',
@@ -699,6 +704,64 @@ function fetchNpmLatest(name) {
     .catch(function () { return null })
 }
 
+/** 0.9.28：repo → 实际 bundle 名映射持久化（卡名≠包名判重修正；体量极小，无 TTL）。
+ * 学习来源 = 安装成功时 enableNewBundles 的 before/after diff（新出现 bundle 名）；
+ * 消费点 = 市场卡 installedNameFor 第三候选键。Node 测试环境无 localStorage，静默降级。 */
+var REPOPKG_CACHE_KEY = 'dsh-plugin-cards.repopkg.v1'
+function repoPkgMapLoad() {
+  try {
+    if (typeof localStorage === 'undefined') return {}
+    return JSON.parse(localStorage.getItem(REPOPKG_CACHE_KEY) || '{}') || {}
+  } catch (e) { return {} }
+}
+function repoPkgMapSave(m) {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(REPOPKG_CACHE_KEY, JSON.stringify(m || {}))
+  } catch (e) { /* 容量超限静默 */ }
+}
+
+/** ---- 0.9.28：市场路由状态持久化（真机 E2E 实证）----
+ * 卸载/安装完成后宿主会整页刷新：用户被踢回会话列表、搜索词清空、市场回默认分类视图，
+ * 连续操作需重新导航。这里把 q/tab/cat/sub 存 localStorage，重挂载时恢复。
+ * 恢复值全部做形状校验（防旧版本脏数据 / 手改 localStorage 炸渲染）；sub 依附 cat（cat 空则丢弃）。
+ * Node 测试环境无 localStorage，静默降级。 */
+var MKT_VIEW_KEY = 'dcards.mktview.v1'
+var MKT_TABS = ['market', 'installed', 'custom', 'settings']
+function marketViewLoad() {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    var raw = localStorage.getItem(MKT_VIEW_KEY)
+    if (!raw) return null
+    var o = JSON.parse(raw)
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null
+    var out = {}
+    if (typeof o.q === 'string' && o.q.length > 0 && o.q.length <= 100) out.q = o.q
+    if (MKT_TABS.indexOf(o.tab) !== -1) out.tab = o.tab
+    if (typeof o.cat === 'string' && o.cat.length > 0 && o.cat.length <= 40) out.cat = o.cat
+    if (out.cat && typeof o.sub === 'string' && o.sub.length > 0 && o.sub.length <= 40) out.sub = o.sub
+    return out
+  } catch (e) { return null }
+}
+function marketViewSave(part) {
+  try {
+    if (typeof localStorage === 'undefined') return
+    var cur = marketViewLoad() || {}
+    for (var k in part) {
+      if (part[k] === '' || part[k] == null) delete cur[k] // 空值 = 清除该维度（回默认）
+      else cur[k] = part[k]
+    }
+    if (!cur.cat) delete cur.sub // cat 清除时子类随之失效
+    localStorage.setItem(MKT_VIEW_KEY, JSON.stringify(cur))
+  } catch (e) { /* 容量超限/隐私模式静默 */ }
+}
+function marketViewClear() {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.removeItem(MKT_VIEW_KEY)
+  } catch (e) { /* 静默 */ }
+}
+
 /** ---- 0.8.16 rt 缓存分区：fresh（<10min，直接用）/ stale（10min~1h，先用 + 后台刷新）/ expired/missing（立即查）----
  * 解决「发新版后 1h 内缓存不更新」的滞后：stale 条目立即回显旧值，同时后台 revalidate 热更新界面。 */
 var RTVER_FRESH_MS = 2 * 60 * 1000 // 0.8.21：10min → 2min，发新版后最坏 2min 即亮「有更新」
@@ -741,5 +804,12 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     ladderNext: ladderNext, // 0.9.27：降级梯执行层决策（40 块，声明提升可见；走位矩阵见函数头注释）
     npmCandidateFromGithubSpec: npmCandidateFromGithubSpec, // 0.9.24：github spec → npm 降级候选（40 块）
     verifyNpmCandidate: verifyNpmCandidate, // 0.9.24：npm 候选校验/防投毒（40 块）
+    extractGitDepInfo: extractGitDepInfo, // 0.9.28：git 依赖构建授权报错解析（40 块）
+    mergeRepoPkg: mergeRepoPkg, // 0.9.28：repo→bundle 名映射合并（40 块）
+    installedNameFor: installedNameFor, // 0.9.28：市场卡已安装判定（候选键扩展，40 块）
+    marketViewLoad: marketViewLoad, // 0.9.28：市场路由状态持久化（q/tab/cat/sub，重挂载恢复）
+    marketViewSave: marketViewSave,
+    marketViewClear: marketViewClear,
+    fmtStars: fmtStars, // 0.9.28 UI 巡检：星数紧凑格式化（40 块，声明提升可见）
   }
 }

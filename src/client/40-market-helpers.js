@@ -9,18 +9,29 @@ function matchCat(item, cat) {
   return classifyItem(item) === cat
 }
 
-var CHIP_STYLE_BASE = { padding: '2px 10px', borderRadius: '12px', fontSize: '12px', cursor: 'pointer', border: '1px solid var(--dsw-alias-border-l1)', background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', whiteSpace: 'nowrap', flexShrink: 0 }
+// 0.9.28 UI 巡检：控件高度统一基准 26px——此前 chip 22px / 搜索行 26px（显式覆盖）混排，
+// 统一由 CHIP_STYLE_BASE 定高（border-box），搜索行的显式 height:26 覆盖保留但变为冗余无害。
+var CHIP_STYLE_BASE = { padding: '2px 10px', borderRadius: '12px', fontSize: '12px', height: '26px', boxSizing: 'border-box', cursor: 'pointer', border: '1px solid var(--dsw-alias-border-l1)', background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', whiteSpace: 'nowrap', flexShrink: 0 }
 function chipStyle(active) {
   var s = {}
   for (var k in CHIP_STYLE_BASE) s[k] = CHIP_STYLE_BASE[k]
   if (active) { s.background = 'var(--dsw-alias-brand-primary)'; s.borderColor = 'var(--dsw-alias-brand-primary)'; s.color = 'var(--dsw-alias-label-primary-inverted)' }
   return s
 }
-// 0.9.10：分类 chip 紧凑变体（11px / 窄内边距）——自适应换行铺满行宽时更省纵向空间
+// 0.9.10 分类 chip 紧凑变体 → 0.9.28 UI 巡检收回：与全站 chip 统一 26px 基准
+//（折叠行 max-height 30px 仍容得下 26px 单行；字号/内边距不再差异化，视觉一致性优先）。
 function catChipStyle(active) {
-  var s = chipStyle(active)
-  s.padding = '1px 8px'; s.fontSize = '11px'; s.borderRadius = '11px'
-  return s
+  return chipStyle(active)
+}
+
+/** 0.9.28 UI 巡检：星数紧凑格式化（GitHub 风格）——≥1000 缩写为 11.5k（一位小数、去尾 .0），
+ * 1000→1k、11527→11.5k、999→999；非法输入返回空串（调用方不渲染）。 */
+function fmtStars(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return ''
+  if (n < 1000) return String(n)
+  var k = n / 1000
+  var s = k >= 100 ? String(Math.round(k)) : (Math.round(k * 10) / 10).toFixed(1)
+  return s.replace(/\.0$/, '') + 'k'
 }
 
 /** 0.9.23：折叠态选中分类提位（纯函数，不改输入）——分类行默认单行折叠（overflow:hidden），
@@ -171,4 +182,55 @@ function tabStyle(active) {
   for (var k in TAB_BASE) s[k] = TAB_BASE[k]
   if (active) { s.color = 'var(--dsw-alias-brand-primary)'; s.borderBottomColor = 'var(--dsw-alias-brand-primary)' }
   return s
+}
+
+/** 0.9.28：ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED 报错解析（pnpm 11 git 依赖构建授权拦截）。
+ * pnpm 源码级报错形态（2026-10-12 网络核验）：
+ *   ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED
+ *   The git-hosted package "name@version" needs to execute build scripts but is not in the "allowBuilds" allowlist.
+ *   hint: … For example: allowBuilds: <depPath>: true
+ * 其中 depPath 为含来源的精确授权键（如 name@github:owner/repo#commit 或 name@git+https://…），裸包名对 git 依赖无效。
+ * 返回 { keys: [depPath…], pkg: 'name@version'|'' }；非该类报错返回 { keys: [], pkg: '' }。
+ * ⚠️ depPath 内部含冒号（github: / git+https:），只能以尾部 ': true' 为终结符（非贪婪 + 空白界）。 */
+function extractGitDepInfo(text) {
+  var s = String(text || '')
+  var isGitPrepare = s.indexOf('ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED') !== -1 ||
+    s.indexOf('needs to execute build scripts') !== -1
+  if (!isGitPrepare) return { keys: [], pkg: '' }
+  var keys = []
+  var re = /allowBuilds:\s*([^\s]+?):\s*true\b/g
+  var m
+  while ((m = re.exec(s)) !== null) { if (keys.indexOf(m[1]) === -1) keys.push(m[1]) }
+  var pm = /git-hosted package "([^"\s]+)" needs/.exec(s)
+  return { keys: keys, pkg: pm ? pm[1] : '' }
+}
+
+/** 0.9.28：repo → 实际 bundle 名映射合并（纯函数，写时复制）。
+ * 一仓多包场景（root 包名 ≠ 仓库名，如 routing-suite 实装 @dsh-external/dsh-super-injector）：
+ * 已安装判定候选键 [npm, name] 全 miss，需凭安装成功时学到的映射补第三键。
+ * repo/name 任一为空或已同值 → 原引用原样返回（不复制，免无谓重渲染）。 */
+function mergeRepoPkg(map, repo, name) {
+  if (!repo || !name) return map
+  if (map && map[repo] === name) return map
+  var out = {}
+  for (var k in map) out[k] = map[k]
+  out[repo] = name
+  return out
+}
+
+/** 0.9.28：市场卡已安装判定（候选键扩展版）。
+ * 候选顺序：item.npm（bundle 名 = npm 包名）→ item.name（仓库名）→ repoPkg[item.full_name]（安装时学到的实际包名）。
+ * 返回 { name: bundle名|null, via: 'npm'|'name'|'map'|'' }；installed 未就绪（null）返回未安装。 */
+function installedNameFor(item, installed, repoPkg) {
+  if (!installed) return { name: null, via: '' }
+  var cands = [
+    item && item.npm ? item.npm : null,
+    item && item.name ? item.name : null,
+    item && item.full_name && repoPkg ? repoPkg[item.full_name] : null,
+  ]
+  var vias = ['npm', 'name', 'map']
+  for (var i = 0; i < cands.length; i++) {
+    if (cands[i] && installed[cands[i]]) return { name: cands[i], via: vias[i] }
+  }
+  return { name: null, via: '' }
 }

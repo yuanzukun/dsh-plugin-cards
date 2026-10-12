@@ -22,7 +22,10 @@ function createCommunitySection(ctx, form) {
     var items = itemsState[0], setItems = itemsState[1]
     var errState = useState('')
     var error = errState[0], setError = errState[1]
-    var queryState = useState('')
+    // 0.9.28：q/tab/cat/sub 持久化（dcards.mktview.v1）——卸载/安装完成后宿主整页刷新重挂载本块，
+    // 不恢复则搜索词清空、被踢出市场上下文（真机 E2E 实证）；形状校验在 marketViewLoad 内
+    var mktView0 = marketViewLoad() || {}
+    var queryState = useState(mktView0.q || '')
     var query = queryState[0], setQuery = queryState[1]
     var busyState = useState('')
     var busy = busyState[0], setBusy = busyState[1]
@@ -60,11 +63,11 @@ function createCommunitySection(ctx, form) {
     var VIEW_KEY = 'dcards.viewMode'
     var viewModeState = useState((function () { try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid' } catch (eVm) { return 'grid' } })())
     var viewMode = viewModeState[0], setViewMode = viewModeState[1]
-    var catState = useState('') // '' = 全部分类
+    var catState = useState(mktView0.cat || '') // '' = 全部分类（0.9.28：初始值从持久化恢复）
     var activeCat = catState[0], setActiveCat = catState[1]
     var catExpandState = useState(false) // 0.9.23：分类行折叠态（默认单行，「更多 ▾」展开全量）
     var catExpand = catExpandState[0], setCatExpand = catExpandState[1]
-    var subCatState = useState('') // 0.9.11 二级分类：'' = 子类·全部（仅 activeCat 有 subs 时有意义）
+    var subCatState = useState(mktView0.sub || '') // 0.9.11 二级分类：'' = 子类·全部（0.9.28：从持久化恢复，load 时已保证依附 cat）
     var activeSub = subCatState[0], setSubCat = subCatState[1]
     // 0.5.4 全量精确统计：{ status:'loading'|'ready'|'error', done, total, items, counts, builtAt }
     // items = 全量 compact 条目（按 ★ 降序）；counts = {分类: 精确条数}
@@ -152,6 +155,10 @@ function createCommunitySection(ctx, form) {
     // 0.8.3 实时版本表：{ bundleName: { v: '最新版'|null, at } }；v=null 表示无 npm 包（git-only），回退快筛比较
     var rtVerState = useState({})
     var rtVer = rtVerState[0], setRtVer = rtVerState[1]
+    // 0.9.28：repo → 实际 bundle 名映射（localStorage 持久化）——一仓多包（root 包名 ≠ 仓库名）场景，
+    // 已安装判定候选键 [npm, name] 全 miss，凭安装成功时学到的映射补第三键（installedNameFor 消费）
+    var repoPkgState = useState(repoPkgMapLoad)
+    var repoPkg = repoPkgState[0], setRepoPkg = repoPkgState[1]
     useEffectFn(function () {
       if (bundles === null || !bundles.length) return
       var cache = rtverCacheLoad()
@@ -671,7 +678,8 @@ function createCommunitySection(ctx, form) {
     var installRef = useRef(null) // pumpQueue → install 循环引用解法：install 定义后回填
 
     // 0.8.0：Tab 导航（market 插件市场 / installed 已安装 / custom 自定义安装 / settings 设置）
-    var tabState = useState('market')
+    // 0.9.28：tab 从持久化恢复（卸载后整页刷新被踢回会话列表 → 重挂载直接回到原 Tab）
+    var tabState = useState(mktView0.tab || 'market')
     var tab = tabState[0], setTab = tabState[1]
     // 安装确认弹窗：{ spec, name, href, cli, gitOnly }（点市场卡片或自定义安装先弹确认，确认后才执行安装）
     var confirmInstState = useState(null)
@@ -784,15 +792,22 @@ function createCommunitySection(ctx, form) {
       })
     }
     /** 0.8.24：启用失败不再静默——收集失败名单交调用方展示。0.8.23 前失败被空 catch 吞掉，
-     *  安装横幅恒报「已安装并启用」，启用失败用户无从得知。 */
+     *  安装横幅恒报「已安装并启用」，启用失败用户无从得知。
+     *  0.9.28：返回 { failed, added, verMap }——added 为本次新出现（安装落地）的 bundle 名名单，
+     *  供 install() 学习 repo → 实际包名映射（卡名≠包名判重修正）；verMap 为名→实装版本
+     *  （宿主 BundleInfo.version），安装成功横幅带真实版本（市场卡快照版本会滞后 HEAD 实装）。 */
     var enableNewBundles = function (before) {
       return Promise.resolve().then(function () { return pm.listBundles().then(unwrapRpc) }).then(function (list) {
         var arr = Array.isArray(list) ? list : []
         var failed = []
+        var added = []
+        var verMap = {}
         var seq = Promise.resolve()
         for (var i = 0; i < arr.length; i++) {
           (function (b) {
             if (b && b.name && !before[b.name]) {
+              added.push(b.name)
+              if (b.version) verMap[b.name] = b.version
               seq = seq.then(function () {
                 return pm.setBundleEnabled(b.name, true).then(unwrapRpc).then(function (res) {
                   checkChange(res, T('mk.opEnable', { name: b.name }))
@@ -801,7 +816,7 @@ function createCommunitySection(ctx, form) {
             }
           })(arr[i])
         }
-        return seq.then(function () { return failed })
+        return seq.then(function () { return { failed: failed, added: added, verMap: verMap } })
       })
     }
 
@@ -834,21 +849,56 @@ function createCommunitySection(ctx, form) {
           stepOp('download')
           return pm.installBundle(spec, { enabled: false, requestId: requestId }).then(unwrapRpc).then(function (res) { return { before: ctx2.before, app: checkChange(res, T('mk.opInstall', { spec: spec })) } })
         })
-        .then(function (ctx2) { stepOp('enable'); return enableNewBundles(ctx2.before).then(function (failedEnables) { return { failedEnables: failedEnables, app: ctx2.app } }) })
+        .then(function (ctx2) {
+          stepOp('enable')
+          return enableNewBundles(ctx2.before).then(function (res) { return { failedEnables: res.failed, added: res.added, verMap: res.verMap, app: ctx2.app } })
+        })
+        .then(function (ctx3) {
+          // 0.9.28：学习 repo → 实际 bundle 名（安装落地的新 bundle diff）——卡名≠包名判重修正
+          if (repoName && ctx3.added && ctx3.added.length) {
+            setRepoPkg(function (prev) {
+              var next = prev
+              for (var ai = 0; ai < ctx3.added.length; ai++) next = mergeRepoPkg(next, repoName, ctx3.added[ai])
+              repoPkgMapSave(next)
+              return next
+            })
+          }
+          return ctx3
+        })
         .then(function (ctx3) { return refreshInstalled().then(function () { return ctx3 }) })
         .then(function (ctx3) {
           if (ctx3.failedEnables.length) finishOp('warn', T('mk.installedEnableFailed', { spec: spec, list: ctx3.failedEnables.join('；') }), null)
-          else finishOp('ok', T(ctx3.app === 'restart-required' ? 'mk.installedOkRestart' : 'mk.installedOk', { spec: spec }), null)
+          else {
+            // 0.9.28：横幅带实装版本（verMap 首个非空版本；多 bundle 新增时取第一个有版本者）
+            var okVer = ''
+            var vm = ctx3.verMap || {}
+            for (var vk in vm) { if (vm[vk]) { okVer = vm[vk]; break } }
+            var restart0 = ctx3.app === 'restart-required'
+            finishOp('ok', T(okVer ? (restart0 ? 'mk.installedOkRestartVer' : 'mk.installedOkVer') : (restart0 ? 'mk.installedOkRestart' : 'mk.installedOk'), { spec: spec, ver: okVer }), null)
+          }
         })
         .catch(function (e) {
           var m = String((e && e.message) || e)
-          var keys = extractBuildKeys(m)
+          // 0.9.28：构建授权键源——优先 checkChange 随 Error 传递的权威键（宿主 pendingBuilds 优先，
+          // 见其注释）；RPC reject 直出（未经 checkChange）时对 m 兜底提取
+          var eKeys = (e && e.buildKeys && e.buildKeys.length) ? e.buildKeys : extractBuildKeys(m)
+          var eIsGit = e && e.buildKind ? e.buildKind === 'git'
+            : (function () { var g0 = extractGitDepInfo(m); return !!(g0.keys.length || g0.pkg) })()
           var retryPlan = (opts && opts.fbPlan) || null // 0.9.24：降级梯随失败卡片（重试按钮续用完整梯计划）
           var retrySpec0 = retryPlan ? retryPlan.ghSpec : spec
           qPause = true // 0.9.6：失败/构建拦截 → 队列暂停（结果卡片/授权重试行需要用户看见并处理）
-          if (keys.length) {
-            setPendingBuilds({ spec: spec, keys: keys })
+          if (eKeys.length && !eIsGit) {
+            // 0.9.28：generic 构建拦截（registry 包 Ignored build scripts）——pnpm 预写 allowBuilds 占位
+            // → 宿主 approveBuilds 可批 → 授权重试流可用
+            setPendingBuilds({ spec: spec, keys: eKeys })
             finishOp('warn', T('mk.buildBlocked'), null)
+          } else if (eIsGit) {
+            // 0.9.28：git 依赖构建授权拦截 → 失败卡片带人话 + 精确键，**不给授权重试钮**——
+            // 宿主 approveBuilds 的可批准集 = pnpm-workspace.yaml 里 pnpm 预写的占位条目
+            // （app.asar build-approval.js 取证：names.some(!pending.includes) → stale-approval），
+            // 而 GIT_DEP_PREPARE 硬失败路径 pnpm 不写占位 → pending 恒空 → 重试必 stale-approval
+            // （真机两轮 + 源码双证，上游结构性缺口）。出路 = 手动把键写入 allowBuilds 或改走 npm 渠道。
+            finishOp('fail', T('mk.installFailed') + friendlyManageError(e), { spec: retrySpec0, repoName: repoName, fbPlan: retryPlan })
           } else {
             finishOp('fail', T('mk.installFailed') + friendlyManageError({ message: m }), { spec: retrySpec0, repoName: repoName, fbPlan: retryPlan }) // 0.9.6：失败卡片带重试（构建拦截走专属授权重试行，不给裸重试）；0.9.23：网络类天书换人话；0.9.24：retry 带降级梯计划
             // 0.9.24：网络类失败自动降级梯（不开 VPN 也要能装）——
@@ -910,6 +960,18 @@ function createCommunitySection(ctx, form) {
         var flagged = (/\n\s+(\S+@\S+) was published at/.exec(m) || [])[1] || ''
         return T('mk.errMinAge', { pkg: flagged || '?' }) + T('mk.errMinAgeFix')
       }
+      // 0.9.28：pnpm 11 git 依赖构建授权拦截（ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED）→ 原因 + 自救，替代天书；
+      // 优先取 checkChange 随 Error 传递的原始提取（译文不可二次识别），直出场景对原文兜底
+      var gitPrep = (e && e.buildKeys && e.buildKeys.length && e.buildKind === 'git')
+        ? { keys: e.buildKeys, pkg: e.gitDepPkg || '' }
+        : extractGitDepInfo(m)
+      if (gitPrep.keys.length || gitPrep.pkg) {
+        var gMsg = T('mk.errGitPrepare', { pkg: gitPrep.pkg || '?' }) + T('mk.errGitPrepareFix')
+        if (gitPrep.keys.length) gMsg += T('mk.errGitPrepareKey', { key: gitPrep.keys.join('　') })
+        return gMsg
+      }
+      // 0.9.28：宿主 stale-approval——授权键与本次尝试的待构建清单不匹配（每次安装尝试独立记录）
+      if (m.indexOf('stale-approval') !== -1) return T('mk.errStaleApproval')
       if (m.indexOf('stop-profile') !== -1) return T('mk.errStopProfile')
       if (m.indexOf('bundle-in-use') !== -1) return T('mk.errInUse')
       if (m.indexOf('not-removable') !== -1) return T('mk.errNotRemovable')
@@ -933,6 +995,13 @@ function createCommunitySection(ctx, form) {
         // 的原始行对用户无 actionable 信息，换人话 + 自救（重试/查代理/CLI）
         var netKeyDiag = classifyNetError(text)
         if (netKeyDiag) return T(netKeyDiag === 'github' ? 'mk.errNetGithub' : 'mk.errNet') + T('mk.fullLog')
+        // 0.9.28：git 依赖构建授权拦截短路（天书 = pnpm 硬失败全文直出；键已自动提取可复制）
+        var gitPrepDiag = extractGitDepInfo(text)
+        if (gitPrepDiag.keys.length || gitPrepDiag.pkg) {
+          var gMsg = T('mk.errGitPrepare', { pkg: gitPrepDiag.pkg || '?' }) + T('mk.errGitPrepareFix') + T('mk.fullLog')
+          if (gitPrepDiag.keys.length) gMsg += T('mk.errGitPrepareKey', { key: gitPrepDiag.keys.join('　') })
+          return gMsg
+        }
         var lines = text.split('\n')
         var picked = ''
         for (var i = lines.length - 1; i >= 0; i--) {
@@ -966,6 +1035,18 @@ function createCommunitySection(ctx, form) {
         // catch 里 classifyNetError(m) 的英文正则认不出译文，梯子会整体跳过（17:05 真机踩坑：
         // 预检 Empty reply → 中文报错「自动降级未成功」但梯子根本没跑）。这里从原始 diagnostic 重分类。
         e2.netKey = netKeyFromChange(res)
+        // 0.9.28：构建授权信息随 Error 传递（0.9.25 方法论——译文不可二次识别）。
+        // 键源优先级：res.pendingBuilds（宿主对本次尝试记录的权威待构建清单，重试必须逐字匹配，
+        // 否则 stale-approval——真机实测 hint 文案里的键与宿主记录不一致）> 原始 diagnostic 解析
+        // （git 依赖 GIT_DEP_PREPARE_NOT_ALLOWED 的 hint 键）> 客户端 extractBuildKeys（catch 兜底）。
+        var pbHost = res && Array.isArray(res.pendingBuilds) ? res.pendingBuilds.filter(Boolean) : []
+        var gitRaw = extractGitDepInfo(String((res.error && res.error.diagnostic) || ''))
+        var buildKeysArr = pbHost.length ? pbHost : gitRaw.keys
+        if (buildKeysArr.length) {
+          e2.buildKeys = buildKeysArr
+          e2.buildKind = (gitRaw.keys.length || gitRaw.pkg) ? 'git' : 'generic'
+          e2.gitDepPkg = gitRaw.pkg
+        }
         throw e2
       }
       if (res.application === 'cancelled') throw new Error(T('mk.opCancelled', { label: label }))
@@ -1035,18 +1116,29 @@ function createCommunitySection(ctx, form) {
       var p = pendingBuilds
       setPendingBuilds(null)
       setBusy(p.spec); clearMsg()
-      var approved = {}
-      for (var i = 0; i < p.keys.length; i++) approved[p.keys[i]] = true
+      // 0.9.28：宿主 wire schema 为 approvedBuilds: array(string())（app.asar 取证）——
+      // 旧实现传 { key: true } 对象必被边界校验拒绝（wire field "options" failed boundary
+      // validation），授权重试流在宿主 0.2.0-rc.2 上整体失效（本次 git 依赖 E2E 实测暴露）
+      var approved = []
+      for (var i = 0; i < p.keys.length; i++) approved.push(p.keys[i])
       var requestId = newUuid()
       beginOp(T('mk.opInstallBuild', { spec: p.spec }), requestId, 'build', shortSpecName(p.spec), p.spec)
       Promise.resolve()
         .then(function () { return snapshotNames() })
         .then(function (before) { stepOp('download'); return pm.installBundle(p.spec, { enabled: false, requestId: requestId, approvedBuilds: approved }).then(unwrapRpc).then(function (res) { return { before: before, app: checkChange(res, T('mk.opInstall', { spec: p.spec })) } }) })
-        .then(function (ctx2) { stepOp('enable'); return enableNewBundles(ctx2.before).then(function (failedEnables) { return { failedEnables: failedEnables, app: ctx2.app } }) })
+        .then(function (ctx2) { stepOp('enable'); return enableNewBundles(ctx2.before).then(function (res) { return { failedEnables: res.failed, verMap: res.verMap, app: ctx2.app } }) })
         .then(function (ctx3) { return refreshInstalled().then(function () { return ctx3 }) })
         .then(function (ctx3) {
           if (ctx3.failedEnables.length) finishOp('warn', T('mk.installedEnableFailed', { spec: p.spec, list: ctx3.failedEnables.join('；') }), null)
-          else finishOp('ok', T(ctx3.app === 'restart-required' ? 'mk.grantedOkRestart' : 'mk.grantedOk', { spec: p.spec }), null)
+          else {
+            // 0.9.28：横幅带实装版本（与 install 主链同款；grantedOk 文案附版本后缀）
+            var okVer = ''
+            var vm = ctx3.verMap || {}
+            for (var vk in vm) { if (vm[vk]) { okVer = vm[vk]; break } }
+            var restart1 = ctx3.app === 'restart-required'
+            var base = T(restart1 ? 'mk.grantedOkRestart' : 'mk.grantedOk', { spec: p.spec })
+            finishOp('ok', okVer ? base + '（v' + okVer + '）' : base, null)
+          }
         })
         .catch(function (e) { finishOp('fail', T('mk.installFailed') + friendlyManageError(e), { spec: p.spec, repoName: '' }) }) // 0.9.23：网络类天书换人话（与 install 主链同款）
         .then(function () { setBusy(''); endOp() })
@@ -1188,13 +1280,13 @@ function createCommunitySection(ctx, form) {
     var visMore = function () { visState[1]({ key: visKey, n: visN + 60 }) }
 
     var tabsBar = jsx('div', { key: 'tabs', style: { display: 'flex', alignItems: 'center', gap: '2px', borderBottom: '1px solid var(--dsw-alias-border-l2)', marginBottom: '8px', flexWrap: 'wrap' }, children: [
-      jsx('button', { key: 't-market', style: tabStyle(tab === 'market'), onClick: function () { setTab('market') }, children: T('mk.tabMarket') }),
+      jsx('button', { key: 't-market', style: tabStyle(tab === 'market'), onClick: function () { setTab('market'); marketViewSave({ tab: 'market' }) }, children: T('mk.tabMarket') }),
       jsx('button', { key: 't-installed', style: tabStyle(tab === 'installed'), title: T('mk.instTitleTip'),
-        onClick: function () { setTab('installed'); refreshInstalled() },
+        onClick: function () { setTab('installed'); marketViewSave({ tab: 'installed' }); refreshInstalled() },
         children: T('mk.tabInstalled') + (installedCount ? '（' + installedCount + '）' : '') }),
-      jsx('button', { key: 't-custom', style: tabStyle(tab === 'custom'), onClick: function () { setTab('custom') }, children: T('mk.tabCustom') }),
-      jsx('button', { key: 't-settings', style: tabStyle(tab === 'settings'), onClick: function () { setTab('settings') }, children: T('mk.tabSettings') }),
-      (tab === 'market' && (syncChip || osyncBtn)) ? jsx('div', { key: 'tabs-right', style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }, children: [syncChip, sbtn, osyncBtn] }) : null,
+      jsx('button', { key: 't-custom', style: tabStyle(tab === 'custom'), onClick: function () { setTab('custom'); marketViewSave({ tab: 'custom' }) }, children: T('mk.tabCustom') }),
+      jsx('button', { key: 't-settings', style: tabStyle(tab === 'settings'), onClick: function () { setTab('settings'); marketViewSave({ tab: 'settings' }) }, children: T('mk.tabSettings') }),
+      (tab === 'market' && (syncChip || osyncBtn)) ? jsx('div', { key: 'tabs-right', className: 'dcards-tabsright', style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }, children: [syncChip, sbtn, osyncBtn] }) : null,
     ] })
 
     // 0.9.23：折叠态选中分类提位——chips 按条数降序，低频分类被选中时高亮 chip 藏进折叠区、状态反馈丢失；
@@ -1214,7 +1306,7 @@ function createCommunitySection(ctx, form) {
             ? (activeCat ? T('mk.searchInCat', { n: filtered.length }) : T('mk.searchAll', { n: countBase.length }))
             : T('mk.searchPage', { n: items ? items.length : 0 }),
           value: query,
-          onChange: function (e) { setQuery(e.target.value) },
+          onChange: function (e) { setQuery(e.target.value); marketViewSave({ q: e.target.value }) },
         }),
         jsx('button', { key: 'sort', style: Object.assign(chipStyle(sortBy === 'updated'), { height: '26px', boxSizing: 'border-box' }), title: T('mk.sortTip'), // 0.9.23：与 ghost 按钮/搜索框 26px 统一（审计①：chip 按钮 22px vs ghost 26px 混排）
           onClick: function () { setSortBy(sortBy === 'updated' ? 'stars' : 'updated') },
@@ -1263,7 +1355,7 @@ function createCommunitySection(ctx, form) {
             return jsx('button', {
               key: 'cat-' + chip.value, style: catChipStyle(activeCat === chip.value),
               title: tip,
-              onClick: function () { setActiveCat(chip.value); setSubCat(''); setViewPage(1) }, // 0.9.11：换父类重置子类
+              onClick: function () { setActiveCat(chip.value); setSubCat(''); setViewPage(1); marketViewSave({ cat: chip.value, sub: '' }) }, // 0.9.11：换父类重置子类；0.9.28：持久化
               children: text,
             })
           })
@@ -1272,7 +1364,7 @@ function createCommunitySection(ctx, form) {
         jsx('div', { key: 'catsel', className: 'dcards-catsel', children: [
           jsx('span', { key: 'clabel2', className: 'dcards-rowlabel', children: T('mk.catLabel') }),
           jsx('select', { key: 'catselmain', value: activeCat,
-            onChange: function (e) { setActiveCat(e.target.value); setSubCat(''); setViewPage(1) },
+            onChange: function (e) { setActiveCat(e.target.value); setSubCat(''); setViewPage(1); marketViewSave({ cat: e.target.value, sub: '' }) },
             children: catChips.map(function (chip) {
               var text = chip.value === ''
                 ? chip.display + '（' + chip.count + '）'
@@ -1295,7 +1387,7 @@ function createCommunitySection(ctx, form) {
               return jsx('button', {
                 key: 'sub-' + schip.label, style: catChipStyle(activeSub === schip.label),
                 title: T('mk.tipExact', { n: schip.count }),
-                onClick: function () { setSubCat(schip.label); setViewPage(1) },
+                onClick: function () { setSubCat(schip.label); setViewPage(1); marketViewSave({ sub: schip.label }) }, // 0.9.28：持久化
                 children: schip.display + '（' + schip.count + '）',
               })
             })
@@ -1313,7 +1405,7 @@ function createCommunitySection(ctx, form) {
           return [
             jsx('span', { key: 'slabel2', className: 'dcards-rowlabel', children: T('mk.subLabel') }),
             jsx('select', { key: 'subselmain', value: activeSub,
-              onChange: function (e) { setSubCat(e.target.value); setViewPage(1) },
+              onChange: function (e) { setSubCat(e.target.value); setViewPage(1); marketViewSave({ sub: e.target.value }) },
               children: chips.map(function (schip) {
                 return jsx('option', { key: 'so-' + schip.label, value: schip.label, children: schip.display + '（' + schip.count + '）' })
               }) }),
@@ -1471,15 +1563,12 @@ function createCommunitySection(ctx, form) {
         var notInstallable = item.installable === false // 快筛未声明 dsh.bundle（官方插件硬要求）
         var cat = classifyItem(item)
         var catColor = CATEGORY_COLORS[cat] || OTHER_COLOR
-        // 0.8.1 已安装回显（候选键扩展）：bundle 名 = package.json name = npm 包名（item.npm）；
-        // GitHub 仓库条目的仓库名（item.name）也可能即 bundle 名。任一命中即视为已安装。
-        var instName = null
-        if (installed !== null) {
-          var candKeys = [item.npm, item.name]
-          for (var ck = 0; ck < candKeys.length; ck++) {
-            if (candKeys[ck] && installed[candKeys[ck]]) { instName = candKeys[ck]; break }
-          }
-        }
+        // 0.8.1 已安装回显：bundle 名 = package.json name = npm 包名（item.npm）；
+        // GitHub 仓库条目的仓库名（item.name）也可能即 bundle 名。
+        // 0.9.28：候选键扩展第三键 repoPkg[item.full_name]（安装成功时学到的实际包名）——
+        // 一仓多包（root 包名 ≠ 仓库名，如 routing-suite 实装 @dsh-external/dsh-super-injector）时前两键全 miss。
+        var instHit = installedNameFor(item, installed, repoPkg)
+        var instName = instHit.name
         var isInstalled = !!instName
         // 0.7.0 更新检测 → 0.8.3 升级：npm 包实时查 registry 最新版（1h 缓存），git-only 无 npm 包回退快筛版本
         var rtRec = instName ? rtVer[instName] : null
@@ -1501,7 +1590,7 @@ function createCommunitySection(ctx, form) {
         // 2026-10-11 UI 审计①：0★ 卡（1.37 万口径长尾占 48%）此前星数完全隐藏——列表中与高星卡并排无热度信号；
         // 改为 0★ 显示弱化灰「★ 0」（opacity 0.55），有数据与无数据（undefined）仍不显示
         var starsEl = stars === undefined || stars === null ? null
-          : stars ? jsx('span', { key: 'stars', className: 'dcards-stars', style: Object.assign({ flexShrink: 0 }, META_STYLE), children: '★ ' + stars })
+          : stars ? jsx('span', { key: 'stars', className: 'dcards-stars', title: stars >= 1000 ? String(stars) : undefined, style: Object.assign({ flexShrink: 0 }, META_STYLE), children: '★ ' + fmtStars(stars) }) // 0.9.28 UI 巡检：≥1000 缩写 11.5k，title 保留精确数
           : jsx('span', { key: 'stars', className: 'dcards-stars', title: T('mk.zeroStarTip'), style: Object.assign({ flexShrink: 0, opacity: 0.55 }, META_STYLE), children: '★ 0' })
         var avatarEl = jsx('span', { key: 'avatar', className: 'dcards-avatar', 'aria-hidden': true,
           style: { background: catColor },
@@ -1519,7 +1608,7 @@ function createCommunitySection(ctx, form) {
           title: rtRec && rtRec.v ? T('mk.verTipRt') : T('mk.verTipPkg'), children: ver }) : null // 0.9.13：修复 vv 双前缀（ver 已含 v）
         // 2026-10-11 UI 审计③：排队中按钮 disabled 但仍实底亮色——补弱化视觉（opacity .5 + not-allowed）
         var queuedInst = spec !== undefined && installQueue.some(function (it) { return it.spec === spec })
-        var btnEl = isInstalled && !canUpdate ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE, title: T('mk.installedTip'), children: T('mk.installedBadge') })
+        var btnEl = isInstalled && !canUpdate ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE, title: instHit.via === 'map' ? T('mk.installedViaMap', { name: instName }) : T('mk.installedTip'), children: T('mk.installedBadge') })
           : canUpdate ? jsx('button', {
             key: 'btn', style: busy === spec ? BTN_GHOST_STYLE : btnSolid, disabled: busy !== '',
             title: T('mk.updateCardTip', { cur: installedVer[instName] || '?', src: latestSrc, latest: latestVer }),
@@ -1599,7 +1688,7 @@ function createCommunitySection(ctx, form) {
           jsx('p', { key: 't', style: { margin: '0 0 6px', fontSize: '14px', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }, children: T('mk.emptyTitle') }),
           jsx('p', { key: 'd', style: { margin: '0 0 14px', fontSize: '12px', color: 'var(--dsw-alias-label-tertiary)' }, children: T('mk.emptyDesc') }),
           hasFilter ? jsx('button', { key: 'clr', style: BTN_GHOST_STYLE,
-            onClick: function () { setQuery(''); setActiveCat(''); setSubCat(''); setStarMin(0); setViewPage(1) },
+            onClick: function () { setQuery(''); setActiveCat(''); setSubCat(''); setStarMin(0); setViewPage(1); marketViewClear() },
             children: T('mk.clearFilters') }) : null,
         ] })
       })() : null,
@@ -1644,7 +1733,7 @@ function createCommunitySection(ctx, form) {
       tab === 'custom' ? jsx('div', { key: 'custom', style: { marginTop: '4px' }, children: [
         jsx('div', { key: 'row', style: { display: 'flex', gap: '8px', alignItems: 'center' }, children: [
           jsx('input', {
-            key: 'in', style: { flex: 1, maxWidth: '480px', padding: '6px 10px',
+            key: 'in', style: { flex: 1, maxWidth: '480px', padding: '4px 10px', height: '26px', boxSizing: 'border-box', // 0.9.28 UI 巡检：定高 26 与搜索框/按钮基准对齐（原 6px padding content-box → 29px）
               border: '1px solid var(--dsw-alias-border-l1)', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' },
             placeholder: T('mk.customPh'),
             value: customSpec,
@@ -1706,9 +1795,11 @@ function createCommunitySection(ctx, form) {
           }
         }
         return jsx('div', { key: 'modal', style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--dsw-alias-bg-mask-1)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }, children:
-          jsx('div', { style: { width: '480px', maxWidth: '92vw', maxHeight: '86vh', overflow: 'auto', background: 'var(--dsw-alias-bg-layer-1)', borderRadius: '12px', boxShadow: '0 12px 40px rgba(0,0,0,.22)', padding: '18px 20px', position: 'relative' }, children: [
+          // 0.9.28 E2E 复验：弹层补对话框语义（role/aria-modal/aria-label + 关闭钮 aria-label）——读屏可辨、自动化可寻址
+          // 注：宿主 jsx 会改写 aria-labelledby 为生成 id（实测 :rr: 不可解析），故用直给 aria-label
+          jsx('div', { role: 'dialog', 'aria-modal': true, 'aria-label': T('mk.modalTitle'), style: { width: '480px', maxWidth: '92vw', maxHeight: '86vh', overflow: 'auto', background: 'var(--dsw-alias-bg-layer-1)', borderRadius: '12px', boxShadow: '0 12px 40px rgba(0,0,0,.22)', padding: '18px 20px', position: 'relative' }, children: [
             jsx('div', { key: 'ttl', style: { fontWeight: 700, fontSize: '15px', color: 'var(--dsw-alias-label-primary)' }, children: T('mk.modalTitle') }),
-            jsx('button', { key: 'x', onClick: function () { setConfirmInst(null) }, style: { position: 'absolute', top: '8px', right: '12px', border: 'none', background: 'transparent', fontSize: '15px', cursor: 'pointer', color: 'var(--dsw-alias-label-tertiary)' }, title: T('mk.cancelTip'), children: '✕' }),
+            jsx('button', { key: 'x', onClick: function () { setConfirmInst(null) }, 'aria-label': T('mk.cancelTip'), style: { position: 'absolute', top: '8px', right: '12px', border: 'none', background: 'transparent', fontSize: '15px', cursor: 'pointer', color: 'var(--dsw-alias-label-tertiary)' }, title: T('mk.cancelTip'), children: '✕' }),
             jsx('div', { key: 'warn', style: { marginTop: '12px', background: 'var(--dsw-alias-state-error-secondary)', border: '1px solid var(--dsw-alias-state-error-primary)', color: 'var(--dsw-alias-state-error-primary)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px' }, children:
               T('mk.warnBox') }),
             ci.reinstallWarn ? jsx('div', { key: 'rwarn', style: { marginTop: '8px', background: 'var(--dsw-alias-state-warn-tertiary)', border: '1px solid var(--dsw-alias-state-warn-label)', color: 'var(--dsw-alias-state-warn-label)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px' }, children:

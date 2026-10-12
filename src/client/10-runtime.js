@@ -170,7 +170,7 @@ var ZH = {
   'mk.customPh': 'npm 包名 / github:owner/repo 或完整 GitHub URL / 本地 tgz 绝对路径',
   'mk.installDots': '安装…',
   'mk.customNote1': 'npm 包名：最快，走 registry（如 dsh-palimpsest）',
-  'mk.customNote2': 'github:owner/repo：也可直接粘贴完整仓库 URL 自动识别；克隆约 1 分钟，每个新 commit 首次安装/更新会弹一次 pnpm 构建授权，点允许即可（属安全设计）',
+  'mk.customNote2': 'github:owner/repo：也可直接粘贴完整仓库 URL 自动识别；克隆约 1 分钟，含构建脚本时会被 pnpm 构建授权拦截（属安全设计）——按拦截卡指引把授权键写入 profile 的 pnpm-workspace.yaml 后重试；若该插件已发布 npm 包，改用包名安装可免授权', // 0.9.28：git 来源非「点允许即可」，改为自救口径
   'mk.customNote3': '本地 .tgz 绝对路径：离线安装；同版本重装可能被跳过，会给出警示',
   'mk.customNote4': '执行确认：提交后弹出确认层（安全提示 + 来源 + CLI 命令），确认后才执行安装；安装过程与实时进度和市场安装一致',
   // ---- 设置 Tab ----
@@ -195,11 +195,11 @@ var ZH = {
   'mk.llmOff': 'MyMemory 免费接口',
   'mk.scopeNote1': '分类计数：与「仅可安装」口径基于快照全量逐条统计',
   'mk.scopeNote2': '作用范围：分类行与搜索始终作用于插件市场页',
-  'mk.scopeNote3': '本地存储：翻译缓存与快照缓存占用浏览器 localStorage，不影响宿主数据',
+  'mk.scopeNote3': '本地存储：翻译缓存、快照缓存、市场视图状态与来源映射占用浏览器 localStorage，不影响宿主数据', // 0.9.28：补 mktview/repopkg 两类新写入
   'mk.note1': '目录口径：默认只显示可安装插件（package.json 声明 dsh.bundle，宿主安装时终审）',
   'mk.note2': '安全确认：安装前弹出确认层（安全提示 + 来源仓库 + CLI 命令），确认后才执行',
   'mk.note3': '已安装管理：支持 启用 / 停用 / 卸载 / 更新（更新 = 重装最新版）；git 来源插件建议在卡片上点「更新」按仓库地址重装',
-  'mk.note4': '构建授权：含构建脚本的插件会被 pnpm 拦下，点「授权构建并重试」继续',
+  'mk.note4': '构建授权：含构建脚本的插件会被 pnpm 拦下——npm / 本地 tgz 来源点「授权构建并重试」继续；git 来源按拦截卡指引把授权键写入 profile 的 pnpm-workspace.yaml 后重试', // 0.9.28：git 来源无重试钮，区分表述
   'mk.note5': '生效语义：卸载 / 停用立即热生效（无需重启 profile），页面自动刷新完成清理',
   // ---- 安装确认弹窗 ----
   'mk.modalTitle': '确认安装',
@@ -256,6 +256,10 @@ var ZH = {
   'mk.queuePaused': '队列已暂停（上个安装未成功完成）',
   'mk.installedOk': '✅ 已安装并启用：{spec}（宿主已即时生效，刷新页面后新插件界面可见）',
   'mk.installedOkRestart': '✅ 已安装并启用：{spec}（将在我下次启动 DeepSeek Harness 后加载；刷新页面不生效）',
+  // 0.9.28：带实装版本（宿主 BundleInfo.version）——真机 E2E 实证市场卡版本（快照元数据）会滞后
+  // 实装版本（git HEAD 安装实时最新），横幅带本地真实版本消除口径分裂
+  'mk.installedOkVer': '✅ 已安装并启用：{spec}（v{ver}；宿主已即时生效，刷新页面后新插件界面可见）',
+  'mk.installedOkRestartVer': '✅ 已安装并启用：{spec}（v{ver}；将在我下次启动 DeepSeek Harness 后加载；刷新页面不生效）',
   'mk.installedEnableFailed': '⚠️ 已安装：{spec}，但启用失败：{list}（可在「已安装」区块重试启用）',
   'mk.buildBlocked': '⚠️ 安装被 pnpm 构建授权拦下（插件带 prepare 构建脚本）：点下方「授权构建并重试」继续。',
   'mk.installFailed': '❌ 安装失败：',
@@ -305,6 +309,16 @@ var ZH = {
   'mk.fullLog': '（完整日志：~/.dsh/profiles/<profile>/.plugin-manager/logs/）',
   'mk.buildsInvolved': '；涉及构建：',
   'mk.andMore': ' 等 {n} 个',
+  // 0.9.28：pnpm 11 git 依赖构建授权拦截（ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED）——git 托管包到源码
+  // 须跑 prepare 构建，pnpm 10.26+ 默认拒绝执行（供应链硬门禁）；裸包名对 git 依赖无效，须用报错里
+  // 打印的完整键（name@来源，commit 锚定）。授权键已自动提取 → 复用「授权构建并重试」流程
+  'mk.errGitPrepare': 'pnpm 供应链保护拦截：git 托管依赖默认禁止执行构建脚本（prepare），插件 {pkg} 需要构建授权才能安装。',
+  'mk.errGitPrepareFix': '自救：把下方精确键原样复制进 ~/.dsh/profiles/<当前profile>/pnpm-workspace.yaml 的 allowBuilds: 段（键两侧加英文双引号——@ 是 YAML 保留字符，裸写会解析失败；作者更新后提交变化，需重新授权），保存后重试安装；若该插件已发布 npm 包，改用 npm 包名安装可免构建授权。',
+  'mk.errGitPrepareKey': '授权键：{key}',
+  // 0.9.28：市场卡经安装学习映射命中已安装（root 包名 ≠ 仓库名的一仓多包场景）
+  'mk.installedViaMap': '已安装（实际包名：{name}；在「已安装」页管理：启用/停用/卸载）',
+  // 0.9.28：宿主 stale-approval——授权键与本次安装尝试的待构建清单不匹配
+  'mk.errStaleApproval': '授权已过期：宿主对每次安装尝试单独记录待构建清单，重试时须携带与该次尝试匹配的授权键。请重新发起安装，出现「构建授权」提示后立即点「授权构建并重试」。',
   // ---- 分类名（键为 CATEGORY_KEYS 的英文语义键；中文原名仅作逻辑键，不入词典）----
   'cat.agents': '智能体与技能',
   'cat.ui': '界面与桌面',

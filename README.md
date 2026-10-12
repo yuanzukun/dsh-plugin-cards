@@ -54,6 +54,7 @@ pnpm dsh --profile web --dump-config   # 应出现 "# == dsh-plugin-cards" 层
 >
 > - ✅ **dsh 0.2.0+**：桌面端菜单栏「Manage dsh command」可内置 dsh 命令并管理插件，**无需另装 Node / pnpm**（官方 0.2.0-rc.2 起）；`dsh` 已在 PATH 时 CLI 与桌面端默认都用 `~/.dsh`，装完重启桌面端生效
 > - ⚠️ 以下为 **0.1.x 旧版用户**备注：`dsh` 命令需在 deepseek-harness 源码 checkout 根目录执行 `pnpm dsh plugin ...`（本机无全局 dsh）；必须用与桌面端一致的 pnpm（v12），旧 pnpm 重建 modules 会假成功；若 npm 装到偏旧版本，多为 pnpm metadata 缓存陈旧，删除 `%LOCALAPPDATA%/pnpm-cache/v11/metadata/registry.npmjs.org/dsh-plugin-cards.jsonl` 后重试
+> - ⚠️ **CLI 本地路径安装陷阱**（2026-10-12 实测，宿主 0.2.0-rc.2）：`dsh plugin --profile <name> add <本地路径>`（link 模式）只写 dependencies，**不写 `dsh.profile.bundles` 激活清单** → 插件 UI 仅在当前实例存活，实例重启后**静默消失**（`dsh plugin list` 只看 dependencies，极难察觉）。修复：手动把插件名加进 `~/.dsh/profiles/<name>/package.json` 的 `dsh.profile.bundles` 数组后重启。**市场 UI 安装的插件不受影响**（宿主自动补写 bundles）
 
 ## 发布（tag 流水线）
 
@@ -91,6 +92,9 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 ### 安装与网络降级
 
 - 安装/更新/启停/卸载的生效语义对齐官方：宿主无 HMR 时返回 `restart-required`，界面提示「下次启动 DeepSeek Harness 后加载」（桌面端安装后需重启宿主生效，刷新页面无效）
+- **安装成功横幅带实装版本**（0.9.28）：横幅从宿主 `BundleInfo.version` 取本地真实版本（如 `已安装并启用：github:o/r（v1.1.71；…）`）——市场卡版本来自快照元数据（最长滞后一个快照周期），git HEAD 安装实装的是实时最新，卡面与横幅口径分裂会误导用户
+- **市场路由状态持久化**（0.9.28）：搜索词/Tab/分类/子分类存 `dcards.mktview.v1`（localStorage，形状校验后恢复）——卸载/安装完成后宿主整页刷新会重挂载面板，不持久化则搜索词清空、被踢出市场上下文（真机 E2E 实证）；「清除筛选」同步清存储
+- **git 依赖构建授权拦截**（0.9.28）：pnpm 11 对 git 托管依赖的 prepare 构建脚本默认硬拒绝（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`），客户端识别该错误并换人话 + 展示 pnpm hint 打印的精确授权键；该路径程序化授权重试**结构性不可用**（宿主 `approveBuilds` 只批 pnpm 预写进 pnpm-workspace.yaml 的占位条目，硬失败路径无占位——真机两轮 + asar 源码双证），自救 = 把精确键（**两侧加英文双引号**，`@` 是 YAML 保留字符）写入 `allowBuilds:` 段后重试，或改走 npm 渠道（免授权）。generic 构建拦截（registry 包 Ignored build scripts）保留「授权构建并重试」流，且载荷已修正为宿主 wire schema 要求的字符串数组（旧对象载荷被边界校验拒绝，该流此前在宿主 0.2.0-rc.2 上整体失效）
 - 网络类失败文案友好化：宿主 GitHub 连接预检 / git clone / pnpm fetch 的超时·DNS·RST 类错误统一换中文人话 + 自救引导（识别逻辑纯函数 `classifyNetError`，单测覆盖；环境侧可在 profile `cordis.patch.yml` 调大 `githubConnectionTimeoutMs`）
 - **网络失败自动降级梯**（`netSeq` 严格递增防循环，走位决策已外提为纯函数 `ladderNext`，逐级走位有单测）：
   ① npm 同名探测（jsDelivr 拉 package.json，`repository` 字段一致性校验防同名抢注；命中换 npm 名重装，宿主 npm 通道自带 npmmirror 兜底）→ ② hub 镜像 tarball（快照条目带 `tgz` 字段时走 `dsh-plugin-hub` tgz 池，hub CI 预构建）→ ③ codeload tarball URL（与主站不同网络路径；spec 以 `#.tar.gz` 片段结尾通过宿主 `TARBALL_SPEC` 校验）→ ④⑤ 原通道重试 ×2（退避 0.8s/3s）；非 github: spec 退化为原通道重试 ×3

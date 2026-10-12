@@ -225,6 +225,103 @@ test('extractBuildKeys: 抽取 包@tarball 构建键并去重', () => {
   assert.deepEqual(pure.extractBuildKeys('no tarball here'), [])
 })
 
+// ---------- 0.9.28：git 依赖构建授权报错解析（extractGitDepInfo）----------
+test('extractGitDepInfo: 从 pnpm 报错提取 commit 锚定授权键与包名', () => {
+  // 形态核验自 pnpm 源码（@pnpm/exec.prepare-package GIT_DEP_PREPARE_NOT_ALLOWED，2026-10-12）
+  const text = [
+    'ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED',
+    'The git-hosted package "dsh-routing-suite@1.2.0" needs to execute build scripts but is not in the "allowBuilds" allowlist.',
+    'hint: Add the package to "allowBuilds" in your project\'s pnpm-workspace.yaml to allow it to run scripts. For example: allowBuilds: dsh-routing-suite@github:Ebony-Vinyl/dsh-routing-suite#abc1234: true',
+  ].join('\n')
+  const info = pure.extractGitDepInfo(text)
+  assert.deepEqual(info.keys, ['dsh-routing-suite@github:Ebony-Vinyl/dsh-routing-suite#abc1234'])
+  assert.equal(info.pkg, 'dsh-routing-suite@1.2.0')
+})
+test('extractGitDepInfo: 仓库 URL 键形态（git+https，v11.11+）也命中', () => {
+  const text = 'needs to execute build scripts but is not in the "allowBuilds" allowlist. For example: allowBuilds: foo@git+https://github.com/org/foo.git: true'
+  const info = pure.extractGitDepInfo(text)
+  assert.deepEqual(info.keys, ['foo@git+https://github.com/org/foo.git'])
+  assert.equal(info.pkg, '')
+})
+test('extractGitDepInfo: 多键去重 + 非该类报错返回空', () => {
+  const dup = 'needs to execute build scripts. allowBuilds: a@github:o/r#1: true and allowBuilds: a@github:o/r#1: true'
+  assert.deepEqual(pure.extractGitDepInfo(dup).keys, ['a@github:o/r#1'])
+  const other = 'ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION: foo@1.0.0 was published at ...'
+  const none = pure.extractGitDepInfo(other)
+  assert.deepEqual(none.keys, [])
+  assert.equal(none.pkg, '')
+  assert.deepEqual(pure.extractGitDepInfo('').keys, [])
+})
+
+// ---------- 0.9.28：repo→bundle 名映射（mergeRepoPkg / installedNameFor）----------
+test('mergeRepoPkg: 写时复制 + 同值原引用 + 空参短路', () => {
+  const m0 = { 'o/r': '@x/a' }
+  const m1 = pure.mergeRepoPkg(m0, 'o/r2', '@x/b')
+  assert.notEqual(m1, m0) // 变更时新对象（不污染旧状态）
+  assert.equal(m1['o/r2'], '@x/b')
+  assert.equal(pure.mergeRepoPkg(m1, 'o/r2', '@x/b'), m1) // 同值原引用（免重渲染）
+  assert.equal(pure.mergeRepoPkg(m1, '', '@x/c'), m1) // 空参短路
+  assert.equal(pure.mergeRepoPkg(m1, 'o/r3', ''), m1)
+})
+test('installedNameFor: npm → 仓库名 → 学习映射 三级候选', () => {
+  const item = { npm: '', name: 'dsh-routing-suite', full_name: 'Owner/dsh-routing-suite' }
+  const inst = { '@dsh-external/dsh-super-injector': true, 'dsh-web': true }
+  // 前两键 miss → 映射命中（一仓多包核心场景）
+  assert.deepEqual(pure.installedNameFor(item, inst, { 'Owner/dsh-routing-suite': '@dsh-external/dsh-super-injector' }),
+    { name: '@dsh-external/dsh-super-injector', via: 'map' })
+  // npm 键优先
+  const itemNpm = { npm: 'dsh-web', name: 'dsh-web', full_name: 'o/dsh-web' }
+  assert.deepEqual(pure.installedNameFor(itemNpm, inst, {}), { name: 'dsh-web', via: 'npm' })
+  // 仓库名键次之
+  const itemName = { npm: '', name: 'dsh-web', full_name: 'o/dsh-web' }
+  assert.deepEqual(pure.installedNameFor(itemName, inst, {}), { name: 'dsh-web', via: 'name' })
+  // 未安装 / installed 未就绪 / 无映射
+  assert.deepEqual(pure.installedNameFor(item, inst, {}), { name: null, via: '' })
+  assert.deepEqual(pure.installedNameFor(item, null, {}), { name: null, via: '' })
+})
+
+// ---------- 0.9.28：市场路由状态持久化（marketViewLoad/Save/Clear）----------
+test('marketView: 保存-恢复闭环 + 空值清除维度 + sub 依附 cat', () => {
+  const store = {}
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v) },
+    removeItem: (k) => { delete store[k] },
+  }
+  try {
+    assert.equal(pure.marketViewLoad(), null) // 空存储
+    pure.marketViewSave({ q: 'routing', tab: 'market', cat: '智能体与技能', sub: '工作流' })
+    assert.deepEqual(pure.marketViewLoad(), { q: 'routing', tab: 'market', cat: '智能体与技能', sub: '工作流' })
+    pure.marketViewSave({ q: '' }) // 空值 = 清除该维度
+    assert.deepEqual(pure.marketViewLoad(), { tab: 'market', cat: '智能体与技能', sub: '工作流' })
+    pure.marketViewSave({ cat: '' }) // cat 清除 → sub 随之失效
+    assert.deepEqual(pure.marketViewLoad(), { tab: 'market' })
+    pure.marketViewSave({ cat: 'x', sub: 'y' })
+    pure.marketViewSave({ tab: 'installed' }) // 部分更新不覆盖其他维度
+    assert.deepEqual(pure.marketViewLoad(), { tab: 'installed', cat: 'x', sub: 'y' })
+    pure.marketViewClear()
+    assert.equal(pure.marketViewLoad(), null)
+  } finally { delete globalThis.localStorage }
+})
+test('marketViewLoad: 脏数据形状校验（非法 tab/超长 q/无 cat 的 sub 全丢弃）', () => {
+  const store = {}
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v) },
+    removeItem: (k) => { delete store[k] },
+  }
+  try {
+    store['dcards.mktview.v1'] = 'not-json'
+    assert.equal(pure.marketViewLoad(), null)
+    store['dcards.mktview.v1'] = JSON.stringify({ q: 'x'.repeat(120), tab: 'hacked', cat: 'c', sub: 's' })
+    assert.deepEqual(pure.marketViewLoad(), { cat: 'c', sub: 's' }) // q 超长 / tab 非法丢弃
+    store['dcards.mktview.v1'] = JSON.stringify({ q: 'ok', cat: '', sub: 'orphan' })
+    assert.deepEqual(pure.marketViewLoad(), { q: 'ok' }) // 无 cat 的 sub 丢弃
+    store['dcards.mktview.v1'] = JSON.stringify([1, 2])
+    assert.equal(pure.marketViewLoad(), null) // 非对象
+  } finally { delete globalThis.localStorage }
+})
+
 // ---------- rt 缓存分区 ----------
 test('rtverPartition: fresh 直接用 / stale 用+后台刷 / expired 立即查 / 未装跳过', () => {
   const now = 1_800_000_000_000
@@ -265,9 +362,11 @@ test('chipStyle/catChipStyle/tabStyle: 激活态与变体样式', () => {
   assert.equal(base.background, 'var(--dsw-alias-bg-layer-1)')
   assert.equal(active.background, 'var(--dsw-alias-brand-primary)')
   assert.notEqual(active, base) // 激活态返回新对象，不改基础样式
+  // 0.9.28 UI 巡检：catChipStyle 收回紧凑变体（11px/1px 8px → 与全站 chip 统一 26px 基准）
   const compact = pure.catChipStyle(true)
-  assert.equal(compact.padding, '1px 8px')
-  assert.equal(compact.fontSize, '11px')
+  assert.equal(compact.padding, '2px 10px')
+  assert.equal(compact.fontSize, '12px')
+  assert.equal(compact.height, '26px')
   const tab = pure.tabStyle(true)
   assert.equal(tab.borderBottomColor, 'var(--dsw-alias-brand-primary)')
   assert.equal(pure.tabStyle(false).borderBottom, '2px solid transparent')
@@ -472,4 +571,39 @@ test('ladderNext: 止梯门禁——非网络类 / netFbDone（① 级 npm 已�
   // ① 级探测命中换 npm 装（netFbDone）后再次失败 → 不再降级（npm 版本可能略滞后，重试无意义）
   assert.equal(pure.ladderNext('net', { netFbDone: true }, spec), null)
   assert.equal(pure.ladderNext('github', { netFbDone: true, netSeq: 3 }, spec), null)
+})
+
+// ---------- 0.9.28 UI 巡检：星数紧凑格式化 ----------
+test('fmtStars: <1000 原样', () => {
+  assert.equal(pure.fmtStars(0), '0')
+  assert.equal(pure.fmtStars(999), '999')
+  assert.equal(pure.fmtStars(1), '1')
+})
+test('fmtStars: ≥1000 缩写 k（一位小数去尾 0）', () => {
+  assert.equal(pure.fmtStars(1000), '1k')
+  assert.equal(pure.fmtStars(11527), '11.5k')
+  assert.equal(pure.fmtStars(1200), '1.2k')
+  assert.equal(pure.fmtStars(99876), '99.9k')
+  assert.equal(pure.fmtStars(115000), '115k') // ≥100k 无小数
+  assert.equal(pure.fmtStars(1234567), '1235k')
+})
+test('fmtStars: 非法输入返回空串', () => {
+  assert.equal(pure.fmtStars(undefined), '')
+  assert.equal(pure.fmtStars(null), '')
+  assert.equal(pure.fmtStars(-5), '')
+  assert.equal(pure.fmtStars(NaN), '')
+  assert.equal(pure.fmtStars('123'), '')
+})
+// ---------- 0.9.28 UI 巡检：chip 高度统一（样式常量断言，防回归） ----------
+test('chipStyle/catChipStyle: 26px 基准统一（border-box 定高）', () => {
+  var c = pure.chipStyle(false)
+  assert.equal(c.height, '26px')
+  assert.equal(c.boxSizing, 'border-box')
+  // catChipStyle 收回紧凑变体后与 chipStyle 同款（0.9.28 UI 巡检）
+  var cc = pure.catChipStyle(false)
+  assert.equal(cc.height, '26px')
+  assert.equal(cc.fontSize, c.fontSize)
+  assert.equal(cc.padding, c.padding)
+  // active 态不改变高度语义
+  assert.equal(pure.chipStyle(true).height, '26px')
 })
