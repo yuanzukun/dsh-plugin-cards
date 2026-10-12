@@ -164,7 +164,7 @@ var CATEGORY_RULES = [
       { label: '提示词与角色扮演', topics: ['preset', 'jailbreak', 'prompt', 'prompts', 'roleplay', 'tavern'], kw: ['prompt', '预设', '破甲', 'jailbreak', '酒馆', 'tavern', 'roleplay'] },
       { label: '智能体框架', topics: ['ai-agents', 'ai-agent', 'agent', 'agents', 'coding-agent'], kw: ['agent'], catchall: true },
     ] },
-  { label: '界面与桌面', topics: ['web', 'web-ui', 'ui', 'gui', 'desktop-app', 'desktop', 'desktop-pet', 'browser', 'chat', 'frontend', 'mobile', 'data-visualization', 'visualization', 'interactive-visualization', 'sidebar'], kw: ['gui', '桌宠', '宠物', 'browser', 'mobile', 'chat', '可视化', 'visualiz', 'sidebar', '侧边栏', 'galgame'],
+  { label: '界面与桌面', topics: ['web', 'web-ui', 'ui', 'gui', 'desktop-app', 'desktop', 'desktop-pet', 'browser', 'chat', 'frontend', 'mobile', 'data-visualization', 'visualization', 'interactive-visualization', 'sidebar'], kw: ['gui', '桌宠', '宠物', 'browser', 'mobile', 'chat', '可视化', 'visualiz', 'sidebar', '侧边栏', 'galgame', '便签', '小游戏', '五子棋', '批注', '消息编辑'],
     subs: [
       { label: '桌宠与桌面应用', topics: ['desktop-pet', 'desktop-app', 'desktop'], kw: ['desktop', '桌面', '桌宠', '宠物', 'galgame'] },
       { label: '可视化与侧边栏', topics: ['data-visualization', 'visualization', 'interactive-visualization', 'sidebar'], kw: ['可视化', 'visualiz', 'sidebar', '侧边栏', '便签'] },
@@ -276,7 +276,7 @@ function classifySub(item, parentLabel) {
 
 /** ---- 0.5.4 全量精确统计：分桶抓全部仓库 + localStorage 缓存（24h TTL） ---- */
 var CATIDX_CACHE_KEY = 'dsh-plugin-cards.catidx.v1'
-var CATIDX_RULES_VER = 7 // 分类规则/数据口径调整时 +1，使旧缓存整体失效（v7：二级分类 + 准确率调优 + dsh- 前缀漏斗修补）
+var CATIDX_RULES_VER = 8 // 分类规则/数据口径调整时 +1，使旧缓存整体失效（v8：界面与桌面顶级 kw 补便签/小游戏/五子棋/批注/消息编辑，v7：二级分类 + 准确率调优 + dsh- 前缀漏斗修补）
 // 0.8.9：卸载后整页刷新定时器 —— 必须挂模块作用域：卸载成功后宿主刷新会让面板组件卸载重挂，
 // 组件作用域的 timer 会被 effect cleanup 清掉，导致刷新永远不触发（真机实测踩坑）
 var pageReloadTimer = null
@@ -738,6 +738,7 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     classifyNetError: classifyNetError, // 0.9.23：网络类预检错误分类（40 块，声明提升可见）
     netKeyFromChange: netKeyFromChange, // 0.9.24b：ChangeResult 失败 → 网络分类（40 块）
     fbPlanFor: fbPlanFor, TGZ_BASE: TGZ_BASE, // 0.9.24：网络失败降级梯计划（tgz 镜像 + codeload 端点）
+    ladderNext: ladderNext, // 0.9.27：降级梯执行层决策（40 块，声明提升可见；走位矩阵见函数头注释）
     npmCandidateFromGithubSpec: npmCandidateFromGithubSpec, // 0.9.24：github spec → npm 降级候选（40 块）
     verifyNpmCandidate: verifyNpmCandidate, // 0.9.24：npm 候选校验/防投毒（40 块）
   }

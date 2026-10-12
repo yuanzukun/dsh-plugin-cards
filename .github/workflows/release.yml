@@ -35,10 +35,21 @@ jobs:
             exit 1
           fi
 
-      - name: Install & build
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+      # 出厂快照原料出库后（2026-10-12 方案 A），发版构建前从 hub 拉取。
+      # 复用 refresh-factory-snapshot.cjs（拉取+校验+原子落盘，与 ci.yml 同一脚本单一来源），
+      # 勿在此回填内联候选清单——候选与客户端 SNAPSHOT_URLS 的同步义务已收敛进脚本。
+      - name: Fetch factory snapshot (assets/, not tracked)
+        run: node scripts/refresh-factory-snapshot.cjs
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # TS 类型门禁（与 ci.yml 同源）
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
 
       - name: Syntax check client bundle
         run: node --check lib/client.js

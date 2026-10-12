@@ -7,8 +7,17 @@
  *  4. 断言：页面自动刷新（cards 0.8.9 客户端行为）
  *  5. 刷新后重开面板：已安装列表中目标插件消失
  */
-const puppeteer = require('C:/Users/54622/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core')
-const URL = process.env.DSH_URL || 'http://127.0.0.1:3080/?token=RG0xdn-Nx9pLOHzwmBxm1gpxpqz84H0idW74gEQXtCQ'
+let puppeteer
+try {
+  puppeteer = require(process.env.PUPPETEER_CORE_PATH || 'C:/Users/54622/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core')
+} catch (e) {
+  console.error('找不到 puppeteer-core：设 PUPPETEER_CORE_PATH 指向其 node_modules 路径后重试')
+  process.exit(1)
+}
+// 2026-10-12 安全清理：token 不再内置回退值（原硬编码 token 已泄漏入公开 git 历史，
+// 重启 dsh web 即轮换）。运行前设 DSH_URL=面板完整地址（含 ?token=…）。
+const URL = process.env.DSH_URL
+if (!URL) { console.error('需要 DSH_URL 环境变量（面板地址，含 token）'); process.exit(1) }
 const TARGET = process.env.DSH_TARGET || 'dsh-pace-calc'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

@@ -1,0 +1,11 @@
+# 行尾符统一（2026-10-12 第三轮扫描 P1）：全仓文本 LF 锚定
+# 背景：仓库此前无本文件，Windows core.autocrlf 下 git 警告 "LF will be replaced by CRLF"——
+# fresh clone / 重新 checkout 时 lib/ 行尾可能翻转，本地 build 产 LF 会让 lib 漂移守卫
+# （git diff --exit-code -- lib/）误报、并产生全仓 diff 噪音。eol=lf 强制检出也保持 LF。
+* text=auto eol=lf
+
+# 二进制产物显式声明（防文本归一化损坏）
+*.png binary
+*.tgz binary
+*.tar.gz binary
+*.ico binary

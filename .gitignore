@@ -8,3 +8,8 @@ lib/*
 .workbuddy/
 *.tgz
 scripts/*.png
+# 2026-10-12：fetch-all-dsh.cjs 的可再生输出缓存（1.1MB，每次收割重建），不入库
+scripts/dsh-all.json
+# 2026-10-12 方案 A：出厂快照原料出库（hub 全量镜像 7.5MB+，随语料无界增长，真相源=hub 仓库）；
+# 本地/CI 经 scripts/refresh-factory-snapshot.cjs 或 release.yml 拉取步骤获取，不入 git 历史
+assets/cards-snapshot.json

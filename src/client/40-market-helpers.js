@@ -126,6 +126,45 @@ function fbPlanFor(item, spec) {
   }
 }
 
+/** ---- 0.9.27：降级梯执行层决策（纯函数，从 80 块 install catch 外提）----
+ * 输入：netHit（classifyNetError/netKeyFromChange 产物，''=非网络类）、fb（install 的 opts：
+ *   netFbDone=①级 npm 已命中不再降级、netSeq=当前梯级 0=①npm 1=②tgz 2=③cdl 3/4=④⑤重试、
+ *   fbPlan=随失败卡片续用的梯计划）、spec（本次安装 spec）。
+ * 输出：下一动作对象或 null（梯子止步）：
+ *   { kind:'probe', plan, delay }                          —— ① 级 npm 同名探测（异步探测由调用方做）
+ *   { kind:'install', spec, fb, delay, msgKey?, repoFallback? } —— 换 spec 重装（delay=0 立即执行）
+ *     msgKey: 'tgz'|'cdl'|'retry'（调用方映射 T() 文案；undefined=静默重试）
+ *     repoFallback: tgz/cdl 级 op 卡显示名兜底（调用方 repoName || repoFallback；保真原实现）
+ * 走位矩阵（单测 tests/pure.test.mjs「降级梯执行层」逐级断言，勿凭记忆改）：
+ *   有 plan：probe(800) → ②tgz(800，无 tgz 字段原 spec 立即) → ③cdl(800) → ④retry(800)
+ *            → ⑤retry(3000) → null。①级探测命中 → netFbDone 止梯。
+ *   无 plan（非 github: spec）：原通道重试 ×3（seq0→1→2，3000ms/立即/立即）→ seq3 null。
+ *     ⚠️ 旧注释「无梯退化重试 ×2」与实现不符——实际 ×3（seq1/2 走 install 分支原 spec 立即重试），
+ *     0.9.27 外提时以实现为准修正注释并固化单测。
+ *   netHit 空 / fb.netFbDone → 恒 null（非网络类失败与 npm 已换道不走梯）。
+ */
+function ladderNext(netHit, fb, spec) {
+  if (!netHit) return null
+  if (fb && fb.netFbDone) return null
+  var p = (fb && fb.fbPlan) || fbPlanFor(null, spec) || null
+  var seq = (fb && fb.netSeq) || 0
+  if (seq === 0 && p) return { kind: 'probe', plan: p, delay: 800 }
+  if (seq === 1) {
+    return p && p.tgzUrl
+      ? { kind: 'install', spec: p.tgzUrl, fb: { netSeq: 2, fbPlan: p }, delay: 800, msgKey: 'tgz', repoFallback: p.repo }
+      : { kind: 'install', spec: spec, fb: { netSeq: 2, fbPlan: p }, delay: 0 }
+  }
+  if (seq === 2) {
+    return p && p.cdlUrl
+      ? { kind: 'install', spec: p.cdlUrl, fb: { netSeq: 3, fbPlan: p }, delay: 800, msgKey: 'cdl', repoFallback: p.repo }
+      : { kind: 'install', spec: spec, fb: { netSeq: 3, fbPlan: p }, delay: 0 }
+  }
+  if (seq < 5 && (p ? true : seq < 2)) {
+    return { kind: 'install', spec: p ? p.ghSpec : spec, fb: { netSeq: seq + 1, fbPlan: p }, delay: seq === 3 ? 800 : 3000, msgKey: 'retry' }
+  }
+  return null
+}
+
 var TAB_BASE = { padding: '6px 14px', fontSize: '13px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', borderBottom: '2px solid transparent', fontWeight: 500 }
 function tabStyle(active) {
   var s = {}

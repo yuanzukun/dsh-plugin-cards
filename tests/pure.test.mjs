@@ -390,3 +390,86 @@ test('classifyNetError: pnpm fetch 文案（真机三踩，0.9.24c）', () => {
   assert.equal(pure.classifyNetError('GET https://codeload.github.com/o/r/tar.gz/HEAD error (23). Will retry in 10 seconds.'), 'net')
   assert.equal(pure.classifyNetError('安装 github:o/r失败：TimeoutError: The operation was aborted due to timeout（完整日志：…）'), 'net')
 })
+
+// ---- 0.9.27：降级梯执行层逐级走位（ladderNext，40 块外提）----
+// 背景：0.9.26 真机教训——③ 级失败被 ④ 级重试掩盖，E2E 只断言「最终成功」不够。
+// 本组测试把梯子走位矩阵固化为逐级断言：每级输入 (netSeq, fbPlan) 必须产生唯一正确的下一动作。
+test('ladderNext: 完整梯走位 ①probe → ②tgz → ③cdl → ④⑤retry → 止步（有 plan + tgz）', () => {
+  var spec = 'github:o/r'
+  var plan = pure.fbPlanFor({ full_name: 'o/r', tgz: 'o__r.tgz' }, spec)
+  // ① 级（seq=0）：npm 同名探测（探测本身异步，由调用方做；命中 → netFbDone 止梯）
+  var s0 = pure.ladderNext('net', {}, spec)
+  assert.equal(s0.kind, 'probe')
+  assert.equal(s0.plan.cdlUrl, plan.cdlUrl)
+  assert.equal(s0.delay, 800)
+  // 探测落空 → ② 级（seq=1）：换 hub 镜像 tgz
+  var s1 = pure.ladderNext('net', { netSeq: 1, fbPlan: plan }, spec)
+  assert.equal(s1.kind, 'install')
+  assert.equal(s1.spec, plan.tgzUrl)
+  assert.equal(s1.fb.netSeq, 2)
+  assert.equal(s1.msgKey, 'tgz')
+  assert.equal(s1.repoFallback, 'r')
+  assert.equal(s1.delay, 800)
+  // ③ 级（seq=2）：codeload tarball（0.9.26 修复后的 #.tar.gz 结尾 spec）
+  var s2 = pure.ladderNext('net', { netSeq: 2, fbPlan: plan }, spec)
+  assert.equal(s2.kind, 'install')
+  assert.equal(s2.spec, plan.cdlUrl)
+  assert.ok(/\.tar\.gz$/.test(s2.spec), '③ 级 spec 必须以 .tar.gz 结尾（0.9.26 宿主 TARBALL_SPEC 门禁）')
+  assert.equal(s2.fb.netSeq, 3)
+  assert.equal(s2.msgKey, 'cdl')
+  // ④ 级（seq=3）：原通道（ghSpec）重试，退避 800ms
+  var s3 = pure.ladderNext('net', { netSeq: 3, fbPlan: plan }, spec)
+  assert.equal(s3.kind, 'install')
+  assert.equal(s3.spec, 'github:o/r')
+  assert.equal(s3.fb.netSeq, 4)
+  assert.equal(s3.delay, 800)
+  assert.equal(s3.msgKey, 'retry')
+  // ⑤ 级（seq=4）：重试退避 3s
+  var s4 = pure.ladderNext('net', { netSeq: 4, fbPlan: plan }, spec)
+  assert.equal(s4.fb.netSeq, 5)
+  assert.equal(s4.delay, 3000)
+  // seq=5：梯子耗尽止步（netSeq 严格递增防循环的终态）
+  assert.equal(pure.ladderNext('net', { netSeq: 5, fbPlan: plan }, spec), null)
+})
+test('ladderNext: 快照无 tgz 字段 → ② 级跳级走原 spec（真机 0.9.24 行为保真）', () => {
+  var spec = 'github:o/r'
+  var plan = pure.fbPlanFor({ full_name: 'o/r' }, spec)
+  assert.equal(plan.tgzUrl, '')
+  var s1 = pure.ladderNext('net', { netSeq: 1, fbPlan: plan }, spec)
+  assert.equal(s1.kind, 'install')
+  assert.equal(s1.spec, spec) // 原通道，非 tgzUrl
+  assert.equal(s1.delay, 0) // 立即执行（无 setTimeout）
+  assert.equal(s1.msgKey, undefined) // 静默跳级，无文案
+  var s2 = pure.ladderNext('net', { netSeq: 2, fbPlan: plan }, spec)
+  assert.equal(s2.spec, plan.cdlUrl) // cdlUrl 恒有（fbPlanFor 对 github: 必设）
+})
+test('ladderNext: 无梯计划（非 github: spec）→ 原通道重试 ×3 后止步', () => {
+  var spec = 'dsh-plugin-cards'
+  // seq=0 无 plan → 不走 probe，落重试分支（3000ms）
+  var s0 = pure.ladderNext('net', {}, spec)
+  assert.equal(s0.kind, 'install')
+  assert.equal(s0.spec, spec)
+  assert.equal(s0.fb.netSeq, 1)
+  assert.equal(s0.fb.fbPlan, null)
+  assert.equal(s0.delay, 3000)
+  // seq=1/2 走 install 分支原 spec 立即重试（⚠️ 实现实为 ×3，旧注释「×2」有误，0.9.27 已修正）
+  var s1 = pure.ladderNext('net', { netSeq: 1 }, spec)
+  assert.equal(s1.spec, spec)
+  assert.equal(s1.fb.netSeq, 2)
+  assert.equal(s1.delay, 0)
+  var s2 = pure.ladderNext('net', { netSeq: 2 }, spec)
+  assert.equal(s2.spec, spec)
+  assert.equal(s2.fb.netSeq, 3)
+  assert.equal(s2.delay, 0)
+  // seq=3 无 plan → seq<2 不满足 → 止步
+  assert.equal(pure.ladderNext('net', { netSeq: 3 }, spec), null)
+})
+test('ladderNext: 止梯门禁——非网络类 / netFbDone（① 级 npm 已换道）/ netHit 空', () => {
+  var spec = 'github:o/r'
+  // 非网络类失败（如宿主 inspect 拒绝 declares no dsh.bundle，供应链硬门禁）不走梯
+  assert.equal(pure.ladderNext('', {}, spec), null)
+  assert.equal(pure.ladderNext(null, {}, spec), null)
+  // ① 级探测命中换 npm 装（netFbDone）后再次失败 → 不再降级（npm 版本可能略滞后，重试无意义）
+  assert.equal(pure.ladderNext('net', { netFbDone: true }, spec), null)
+  assert.equal(pure.ladderNext('github', { netFbDone: true, netSeq: 3 }, spec), null)
+})

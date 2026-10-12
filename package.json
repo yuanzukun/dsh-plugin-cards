@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-cards",
-  "version": "0.9.26",
+  "version": "0.9.27",
   "description": "DeepSeek Harness (dsh) 设置卡片 + 对话节点插件",
   "license": "MIT",
   "author": "yuanzukun",
@@ -35,6 +35,7 @@
   },
   "scripts": {
     "build": "tsdown && node scripts/assemble-client.cjs",
+    "typecheck": "tsc --noEmit",
     "assemble": "node scripts/assemble-client.cjs",
     "test": "node --test tests/pure.test.mjs",
     "dev": "tsdown --watch"

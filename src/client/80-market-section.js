@@ -853,56 +853,34 @@ function createCommunitySection(ctx, form) {
             finishOp('fail', T('mk.installFailed') + friendlyManageError({ message: m }), { spec: retrySpec0, repoName: repoName, fbPlan: retryPlan }) // 0.9.6：失败卡片带重试（构建拦截走专属授权重试行，不给裸重试）；0.9.23：网络类天书换人话；0.9.24：retry 带降级梯计划
             // 0.9.24：网络类失败自动降级梯（不开 VPN 也要能装）——
             // 真机取证：直连 github.com 主站间歇劣化（时通时断），预检侥幸通过 ≠ 后续 git clone 能撑住。
-            // 梯子每级只试一次，netSeq 严格递增防循环：
-            //   ① npm 同名探测（jsDelivr；宿主 npm 通道带 npmmirror 兜底）→ 命中换 npm 装（netFbDone 止梯）
-            //   ② hub 镜像 tarball（P2 池产物，jsDelivr 国内可达；快照无 tgz 字段自动跳过）
-            //   ③ codeload tarball URL（实测与 github.com 主站不同网络路径，主站被 RST 时常可通）
-            //   ④⑤ 原通道重试 ×2（退避 0.8s / 3s）
-            // 非 github: spec 无梯计划 → 退化为原通道重试 ×2；构建拦截不走本梯子（有专属授权重试行）。
+            // 0.9.27：走位决策外提为纯函数 ladderNext（40 块；走位矩阵与逐级单测见其函数头注释），
+            // 本处只消费动作对象（probe 的异步探测 / install 的延时重装与文案映射）。
             var fb = opts || {}
             var netHit = (e && e.netKey) || classifyNetError(m) // 0.9.24b：ChangeResult 路径的分类随 Error 传递（译文正则认不出）
-            if (netHit && !fb.netFbDone) {
-              var plan = fb.fbPlan || fbPlanFor(null, spec)
-              var seq = fb.netSeq || 0 // 0=①npm 1=②tgz 2=③cdl 3/4=④⑤重试
-              var retrySpec = plan ? plan.ghSpec : spec
-              if (seq === 0 && plan) {
-                // 0.9.24c：探测 promise 自身网络失败也要落到下一级（此前无 .catch → 梯子静默死亡，
-                // 真机嫌疑：NDF1Sc 超时后梯子无后续 op，探测挂了整条链就断了）
-                var probeGo = function (npmName) {
-                  setTimeout(function () {
-                    if (npmName) {
-                      setMessage(T('mk.netFbTryNpm', { name: npmName }))
-                      installRef.current(npmName, repoName || plan.repo, { netFbDone: true })
-                    } else {
-                      installRef.current(spec, repoName, { netSeq: 1, fbPlan: plan })
-                    }
-                  }, 800)
-                }
-                probeNpmCandidate(plan).then(probeGo, function () { probeGo('') })
-              } else if (seq === 1) {
-                if (plan && plan.tgzUrl) {
-                  setTimeout(function () {
-                    setMessage(T('mk.netFbTryTgz', { name: plan.repo }))
-                    installRef.current(plan.tgzUrl, repoName || plan.repo, { netSeq: 2, fbPlan: plan })
-                  }, 800)
-                } else {
-                  installRef.current(spec, repoName, { netSeq: 2, fbPlan: plan })
-                }
-              } else if (seq === 2) {
-                if (plan && plan.cdlUrl) {
-                  setTimeout(function () {
-                    setMessage(T('mk.netFbTryCdl', { repo: plan.repo }))
-                    installRef.current(plan.cdlUrl, repoName || plan.repo, { netSeq: 3, fbPlan: plan })
-                  }, 800)
-                } else {
-                  installRef.current(spec, repoName, { netSeq: 3, fbPlan: plan })
-                }
-              } else if (seq < 5 && (plan ? true : seq < 2)) { // 有梯：④⑤ 两级重试；无梯：仅两级重试
+            var step = ladderNext(netHit, fb, spec)
+            if (step && step.kind === 'probe') {
+              // 0.9.24c：探测 promise 自身网络失败也要落到下一级（此前无 .catch → 梯子静默死亡，
+              // 真机嫌疑：NDF1Sc 超时后梯子无后续 op，探测挂了整条链就断了）
+              var probeGo = function (npmName) {
                 setTimeout(function () {
-                  setMessage(T('mk.netFbRetry', { spec: retrySpec }))
-                  installRef.current(retrySpec, repoName, { netSeq: seq + 1, fbPlan: plan })
-                }, seq === 3 ? 800 : 3000)
+                  if (npmName) {
+                    setMessage(T('mk.netFbTryNpm', { name: npmName }))
+                    installRef.current(npmName, repoName || step.plan.repo, { netFbDone: true })
+                  } else {
+                    installRef.current(spec, repoName, { netSeq: 1, fbPlan: step.plan })
+                  }
+                }, step.delay)
               }
+              probeNpmCandidate(step.plan).then(probeGo, function () { probeGo('') })
+            } else if (step && step.kind === 'install') {
+              var goLadder = function () {
+                if (step.msgKey === 'tgz') setMessage(T('mk.netFbTryTgz', { name: step.fb.fbPlan.repo }))
+                else if (step.msgKey === 'cdl') setMessage(T('mk.netFbTryCdl', { repo: step.fb.fbPlan.repo }))
+                else if (step.msgKey === 'retry') setMessage(T('mk.netFbRetry', { spec: step.spec }))
+                installRef.current(step.spec, step.repoFallback ? (repoName || step.repoFallback) : repoName, step.fb)
+              }
+              if (step.delay) setTimeout(goLadder, step.delay)
+              else goLadder()
             }
           }
           return refreshInstalled() // 失败也要刷新已安装区块（宿主可能已落地部分状态）

@@ -32,6 +32,9 @@ export interface Config {
 }
 
 // 约定：凡部署间可能不同的值一律成为配置字段，禁止硬编码；约束在 schema 表达，加载期响亮失败。
+// 收窄转换说明：volatile() 字段在 schema 静态类型里是 Volatile<string>（运行期 Reference），
+// 宿主解析后到达 apply 的已是普通值——schemastery 类型系统无法同时表达两态，
+// meta.default 上的型变差异需在此显式收窄（typecheck 门禁 2026-10-12 接入时确认）。
 export const Config: Schema<Config> = Schema.object({
   enabled: Schema.boolean().default(true).description('是否启用设置卡片与对话节点'),
   cardTitle: Schema.string().default('Plugin Cards').description('卡片 / 对话节点标题'),
@@ -45,7 +48,7 @@ export const Config: Schema<Config> = Schema.object({
     .volatile(),
   llmModel: Schema.string().default('deepseek-chat').description('翻译模型名（与端点配套）').volatile(),
   llmApiKey: Schema.string().default('').description('翻译 API Key（仅浏览器直连翻译端点使用，缓存于本机）').volatile(),
-})
+}) as unknown as Schema<Config>
 
 /** volatile 字段在运行期是 Reference 对象；日志里安全解包为普通值。 */
 function show(v: unknown): string {
