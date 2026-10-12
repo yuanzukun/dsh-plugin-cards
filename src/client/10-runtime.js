@@ -59,6 +59,7 @@ var ZH = {
   'mk.txMissing': '⚠ {n} 条未翻译',
   'mk.txMissingTip': '本页有 {n} 条英文描述未译出（翻译通道之前失败或配额耗尽，已被本轮停用）；点击重置通道并重试。翻译按页懒执行：翻到哪页译哪页',
   'mk.loadMore': '加载更多（剩 {n}）',
+  'mk.zeroStarTip': '暂无 star（社区热度信号缺失，排序按更新时间与规范合规分兜底）',
   // ---- 数据源 / 同步 ----
   'mk.syncTipBase': '当前目录数据生成于 {at}（hub 快照每日 02:30/14:30 自动构建；打开市场时后台自动刷新，面板常驻时每 30 分钟自动检查）',
   'mk.syncTipOfficial': '；官方源（github.com/topics/dsh-plugin）上次全量直采：{at}（每 24h 自动，或点「官方源同步」手动）',

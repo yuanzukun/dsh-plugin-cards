@@ -348,12 +348,31 @@ function catIdxCacheLoad(qFlags, totalCount) {
 }
 
 function catIdxCacheSave(c) {
+  // 2026-10-11 顺序修正：zhmap 先写。浏览器 localStorage 配额按「同源共享」计（Chrome ~5MB/源，
+  // catidx + zhmap + tx 同池），旧顺序先写 catidx 会把小而关键的 zhmap 挤出配额——
+  // #42 快照实测（13721 条）：catidx 全量 6.12M chars / 降级后 5.24M chars，加 zhmap 0.66M
+  // 合计 5.9M 必超 5.24M 配额 → zhmap 恒失败（0.9.16 反英文固化保障失效）。
+  // 先写 zhmap：小而关键的数据优先占位；zhmap 本体 ~0.66M 单独入库无压力。
+  try {
+    if (c && Array.isArray(c.items)) {
+      var zm = {}
+      try { zm = JSON.parse(localStorage.getItem('dsh-plugin-cards.zhmap.v1') || '{}') || {} } catch (eZ0) { zm = {} }
+      var zDirty = false
+      for (var zi = 0; zi < c.items.length; zi++) {
+        var zIt = c.items[zi]
+        if (zIt && zIt.full_name && zIt.descZh && zm[zIt.full_name] !== zIt.descZh) { zm[zIt.full_name] = zIt.descZh; zDirty = true }
+      }
+      if (zDirty) localStorage.setItem('dsh-plugin-cards.zhmap.v1', JSON.stringify(zm))
+    }
+  } catch (eZ) { /* 容量超限静默：回填退化为 catidx 内映射 */ }
+  // catidx 持久化：全量 → 降级（剥已译条目 EN desc，展示仍中文、搜索失去已译条目英文关键词）
+  // → 仍超限则静默放弃（旧缓存原子性保留，TTL 过期自然重建）。
+  // 1.4 万条口径下序列化 ~5.2-5.9M chars 必超 ~5MB 配额，放弃后的代价可控：
+  // jsDelivr HTTP 缓存承接重拉 + 索引重建（Node 实测 13721 条全链路 ~230ms）；比反复降级更可预期。
+  // 终解（预计算 cat/sub 标签替代 topics 入缓存）随 80 块拆分另行落地。
   try {
     localStorage.setItem(CATIDX_CACHE_KEY, JSON.stringify(c))
   } catch (eFull) {
-    // 0.9.18：快照扩到 ~2.4 万条后整体序列化可能超 localStorage ~5MB 配额 → 降级重试：
-    // 已有 descZh 的条目剥掉英文原文 description（展示仍中文、搜索仅对已译条目失去英文关键词命中），
-    // 仍超限则放弃缓存（每次打开走快照请求，功能不受损）
     try {
       var slim = {}, k2
       for (k2 in c) slim[k2] = c[k2]
@@ -369,22 +388,8 @@ function catIdxCacheSave(c) {
         } else slim.items.push(it2)
       }
       localStorage.setItem(CATIDX_CACHE_KEY, JSON.stringify(slim))
-    } catch (eSlim) { /* 放弃缓存 */ }
+    } catch (eSlim) { /* 放弃缓存：旧值原子保留，HTTP 缓存 + 重建兜底 */ }
   }
-  // 0.9.16：同步持久化 zh 映射（full_name → descZh，独立于 catidx 生命周期）——
-  // catidx 会被 24h 直采产物顶掉，若无独立映射，直采回填的数据源随顶掉而消失（英文固化死循环）
-  try {
-    if (c && Array.isArray(c.items)) {
-      var zm = {}
-      try { zm = JSON.parse(localStorage.getItem('dsh-plugin-cards.zhmap.v1') || '{}') || {} } catch (eZ0) { zm = {} }
-      var zDirty = false
-      for (var zi = 0; zi < c.items.length; zi++) {
-        var zIt = c.items[zi]
-        if (zIt && zIt.full_name && zIt.descZh && zm[zIt.full_name] !== zIt.descZh) { zm[zIt.full_name] = zIt.descZh; zDirty = true }
-      }
-      if (zDirty) localStorage.setItem('dsh-plugin-cards.zhmap.v1', JSON.stringify(zm))
-    }
-  } catch (eZ) { /* 容量超限静默：回填退化为 catidx 内映射 */ }
 }
 
 /** ---- 0.5.5 快照优先：dsh-plugin-hub 每日产出全量快照，1 次请求秒级就绪；失败/过期回退出厂快照/收割 ----
@@ -708,6 +713,7 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     catLabel: catLabel, tParams: tParams,
     specOf: specOf, shortSpecName: shortSpecName, parsePnpmCounts: parsePnpmCounts, fmtMMSS: fmtMMSS,
     classifyItem: classifyItem, subsOf: subsOf, classifySub: classifySub,
+    catIdxFromSnapshot: catIdxFromSnapshot, // 2026-10-11：快照容量探针（scripts/verify-snapshot-capacity.cjs）需要全链路复现
     compactItem: compactItem, rankSort: rankSort, dedupItems: dedupItems,
     buildSearchUrl: buildSearchUrl, topicOfSearchUrl: topicOfSearchUrl, isGithubSearchApi: isGithubSearchApi,
     hashStr: hashStr, isPlaceholderDesc: isPlaceholderDesc, llmUrl: llmUrl,

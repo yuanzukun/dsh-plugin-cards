@@ -77,7 +77,8 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 - 二级分类（0.9.11）：六个大类（智能体与技能/界面与桌面/记忆与知识/工具与自动化/框架与宿主集成/模型与多模态）选中后浮出子类 chips 行，与父类 AND 过滤、精确计数；分类兜底阶段 `dsh-`/`dsh_` 名称前缀归入框架与宿主集成，「其他」长尾实测 682 → 56 条
 - npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认显示（0.9.5 起默认开，可关回官方 topic 纯口径）；宿主本体仓不借星
 - 安装/更新/启停/卸载的生效语义对齐官方：宿主无 HMR 时返回 `restart-required`，界面明确提示「下次启动 DeepSeek Harness 后加载」（桌面端安装后需重启宿主生效，刷新页面无效）
-- 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏（**0.9.8 起按星裁剪：GitHub/both Top 1500 + npm-only 可安装 100，约 0.8MB；完整目录打开市场后由在线链路自动补齐**，裁剪参数见 `scripts/assemble-client.cjs --keep/--npm-keep`）
+- 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏（**0.9.8 起按星裁剪：GitHub/both Top 1500，约 0.8MB；✏️ 0.9.20 起原料为 hub 1.4.2 新口径（无 npm-only 条目，`--npm-keep` 保留仅防御），出厂原料 13721 条 / 内联 0.77MB；完整目录打开市场后由在线链路自动补齐**，裁剪参数见 `scripts/assemble-client.cjs --keep/--npm-keep`）
+- 缓存配额适配（0.9.20）：1.4 万条目下 localStorage 同源共享配额（~5.24M chars）必超——`zhmap`（full_name→descZh 翻译映射）优先写入保住 0.9.16 反英文固化链路；catidx 全量缓存超限后按设计放弃持久化（旧缓存原子保留，jsDelivr HTTP 缓存承接重拉 + 重建 ~230ms 兜底）；容量探针 `scripts/verify-snapshot-capacity.cjs` 可复现实测
 - 界面文案只显示中文（EN 词典引用 ZH，完整走官方 locale 服务）
 
 ## License

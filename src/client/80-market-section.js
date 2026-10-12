@@ -1148,7 +1148,7 @@ function createCommunitySection(ctx, form) {
         txMissingN > 0 ? jsx('button', { key: 'txmissing', style: Object.assign({}, BTN_GHOST_STYLE, { whiteSpace: 'nowrap', flexShrink: 0, opacity: 0.75 }),
           title: T('mk.txMissingTip', { n: txMissingN }),
           onClick: function () { llmDownRef.current = false; txQuotaRef.current = { until: 0, tries: 0 }; setTxRetry(function (v) { return v + 1 }) },
-          children: T('mk.txMissing', { n: txMissingN }) }) : null,
+          children: T('mk.txMissing', { n: txMissingN > 99 ? '99+' : txMissingN }) }) : null, // 2026-10-11 审计⑤：计数 99+ 封顶防数字跳动（title 保留精确数）
       ] }) : null,
       ] }),
       tab === 'market' && catChips.length ? jsx('div', { key: 'filterbar', className: 'dcards-filterbar', children: [
@@ -1330,7 +1330,7 @@ function createCommunitySection(ctx, form) {
           }) })
       })() : null,
       tab === 'market' && items === null && !error ? jsx('div', { key: 'skel', className: 'dcards-grid', children:
-        [0, 1, 2, 3, 4, 5].map(function (i) { return jsx('div', { key: 'sk-' + i, className: 'dcards-skel' }) })
+        [0, 1, 2, 3, 4, 5, 6, 7, 8].map(function (i) { return jsx('div', { key: 'sk-' + i, className: 'dcards-skel' }) }) // 2026-10-11 审计④：6→9 张，大视口 3 列铺满 3 行
       }) : null,
       // 0.9.12 P2：网格/列表双视图（P2-10）+ 增量渲染（P2-11：先渲 visN 条，翻页/筛选变化自动重置）
       tab === 'market' && pageItems !== null ? jsx('div', { key: 'list', className: viewMode === 'list' ? 'dcards-list' : 'dcards-grid', children: pageItems.slice(0, visN).map(function (item, index) {
@@ -1373,7 +1373,11 @@ function createCommunitySection(ctx, form) {
         var subLine = ownerName + (ownerName && updated ? ' · ' : '') + (updated ? T('mk.updatedRel', { rel: updatedRel }) : '')
         var btnSolid = Object.assign({}, BTN_STYLE, { background: catColor }) // 0.9.13：安装/更新钮分类色实底（与左条/色点同色系）
         // 0.9.16：卡片元素抽取（网格/列表共用），方案 A 列表堆叠：l1 名称+owner+★ / l2 描述 / l3 元数据 + 右侧安装钮
-        var starsEl = stars === undefined || !stars ? null : jsx('span', { key: 'stars', className: 'dcards-stars', style: Object.assign({ flexShrink: 0 }, META_STYLE), children: '★ ' + stars })
+        // 2026-10-11 UI 审计①：0★ 卡（1.37 万口径长尾占 48%）此前星数完全隐藏——列表中与高星卡并排无热度信号；
+        // 改为 0★ 显示弱化灰「★ 0」（opacity 0.55），有数据与无数据（undefined）仍不显示
+        var starsEl = stars === undefined || stars === null ? null
+          : stars ? jsx('span', { key: 'stars', className: 'dcards-stars', style: Object.assign({ flexShrink: 0 }, META_STYLE), children: '★ ' + stars })
+          : jsx('span', { key: 'stars', className: 'dcards-stars', title: T('mk.zeroStarTip'), style: Object.assign({ flexShrink: 0, opacity: 0.55 }, META_STYLE), children: '★ 0' })
         var avatarEl = jsx('span', { key: 'avatar', className: 'dcards-avatar', 'aria-hidden': true,
           style: { background: catColor },
           title: catLabel(cat), children: (shortName || '?').charAt(0).toUpperCase() })
@@ -1388,6 +1392,8 @@ function createCommunitySection(ctx, form) {
           title: T('mk.engineBadTip'), children: '⚠ ' + T('mk.engineBad') }) : null
         var verEl = ver ? jsx('span', { key: 'ver', style: META_STYLE,
           title: rtRec && rtRec.v ? T('mk.verTipRt') : T('mk.verTipPkg'), children: ver }) : null // 0.9.13：修复 vv 双前缀（ver 已含 v）
+        // 2026-10-11 UI 审计③：排队中按钮 disabled 但仍实底亮色——补弱化视觉（opacity .5 + not-allowed）
+        var queuedInst = spec !== undefined && installQueue.some(function (it) { return it.spec === spec })
         var btnEl = isInstalled && !canUpdate ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE, title: T('mk.installedTip'), children: T('mk.installedBadge') })
           : canUpdate ? jsx('button', {
             key: 'btn', style: busy === spec ? BTN_GHOST_STYLE : btnSolid, disabled: busy !== '',
@@ -1398,8 +1404,8 @@ function createCommunitySection(ctx, form) {
           : notInstallable ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE,
             title: T('mk.notInstallableTip'), children: '🚫 ' + T('mk.notInstallable') })
           : spec === undefined ? null : jsx('button', {
-            key: 'btn', style: busy === spec ? BTN_GHOST_STYLE : btnSolid,
-            disabled: installQueue.some(function (it) { return it.spec === spec }), // 0.9.6：已在队列 → 禁用防重复入队
+            key: 'btn', style: Object.assign({}, busy === spec ? BTN_GHOST_STYLE : btnSolid, queuedInst ? { opacity: 0.5, cursor: 'not-allowed' } : null),
+            disabled: queuedInst, // 0.9.6：已在队列 → 禁用防重复入队
             // 0.8.0：先弹安装确认（安全提示 + 来源 + CLI 命令），确认后才执行安装；0.9.6 busy 时确认后入队
             onClick: function () {
               setConfirmInst({
@@ -1407,7 +1413,7 @@ function createCommunitySection(ctx, form) {
                 gitOnly: item.source === 'github' || !item.npm,
               })
             },
-            children: busy === spec ? T('mk.installing') : installQueue.some(function (it) { return it.spec === spec }) ? T('mk.queuedBadge') : T('mk.install'),
+            children: busy === spec ? T('mk.installing') : queuedInst ? T('mk.queuedBadge') : T('mk.install'),
           })
         var descEl = (function () {
           // 0.9.10：展示优先级 条目自带 zh（hub 预翻译 descZh）> 运行时翻译缓存 > 原文；连续「|」分隔符清洗为「·」
@@ -1416,7 +1422,7 @@ function createCommunitySection(ctx, form) {
           var isPh = isPlaceholderDesc(rawDesc, item.name)
           var descZh = isPh ? null : (item.descZh || (item.description ? txRef.current[hashStr(item.description)] : null) || null)
           var shown = isPh ? '' : String(descZh || rawDesc).replace(/\s*\|\s*(?:\|\s*)*/g, ' · ').replace(/\s*·\s*$/, '')
-          return jsx('p', { key: 'desc', className: 'dcards-desc', title: descZh ? item.description : undefined, children: shown }) // 空描述也渲染：撑起 min-height 齐底
+          return jsx('p', { key: 'desc', className: 'dcards-desc', title: shown ? rawDesc : undefined, children: shown }) // 空描述也渲染：撑起 min-height 齐底；2026-10-11 审计②：title 恒给完整原文（原仅已译条目有 tooltip，纯英文条目 hover 无处看全文）
         })()
         return jsx('div', { key: key, className: 'dcards-card', style: { borderLeft: '3px solid ' + catColor }, children: viewMode !== 'list' ? [ // 0.9.13：分类色左条；网格维持双行头部结构
           jsx('div', { key: 'head', className: 'dcards-head', children: [
