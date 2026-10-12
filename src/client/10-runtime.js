@@ -57,6 +57,7 @@ var ZH = {
   'mk.viewList': '列表',
   'mk.viewTip': '切换目录视图（网格 / 列表）',
   'mk.txMissing': '⚠ {n} 条未翻译',
+  'mk.noDesc': '暂无描述',
   'mk.txMissingTip': '本页有 {n} 条英文描述未译出（翻译通道之前失败或配额耗尽，已被本轮停用）；点击重置通道并重试。翻译按页懒执行：翻到哪页译哪页',
   'mk.loadMore': '加载更多（剩 {n}）',
   'mk.zeroStarTip': '暂无 star（社区热度信号缺失，排序按更新时间与规范合规分兜底）',

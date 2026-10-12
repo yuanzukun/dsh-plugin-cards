@@ -1421,8 +1421,10 @@ function createCommunitySection(ctx, form) {
           var rawDesc = String(item.description || '')
           var isPh = isPlaceholderDesc(rawDesc, item.name)
           var descZh = isPh ? null : (item.descZh || (item.description ? txRef.current[hashStr(item.description)] : null) || null)
-          var shown = isPh ? '' : String(descZh || rawDesc).replace(/\s*\|\s*(?:\|\s*)*/g, ' · ').replace(/\s*·\s*$/, '')
-          return jsx('p', { key: 'desc', className: 'dcards-desc', title: shown ? rawDesc : undefined, children: shown }) // 空描述也渲染：撑起 min-height 齐底；2026-10-11 审计②：title 恒给完整原文（原仅已译条目有 tooltip，纯英文条目 hover 无处看全文）
+          // 0.9.21：空描述/占位描述显示弱化「暂无描述」（市场界面全中文收尾——hub tx-cache 已全量覆盖自然语言描述，0.9.20 实测客户端口径未翻译=0）
+          var noDesc = !rawDesc || isPh
+          var shown = noDesc ? T('mk.noDesc') : String(descZh || rawDesc).replace(/\s*\|\s*(?:\|\s*)*/g, ' · ').replace(/\s*·\s*$/, '')
+          return jsx('p', { key: 'desc', className: 'dcards-desc', style: noDesc ? { opacity: 0.55 } : undefined, title: noDesc ? undefined : rawDesc, children: shown }) // 空描述也渲染：撑起 min-height 齐底；title 恒给完整原文（2026-10-11 审计②）
         })()
         return jsx('div', { key: key, className: 'dcards-card', style: { borderLeft: '3px solid ' + catColor }, children: viewMode !== 'list' ? [ // 0.9.13：分类色左条；网格维持双行头部结构
           jsx('div', { key: 'head', className: 'dcards-head', children: [
