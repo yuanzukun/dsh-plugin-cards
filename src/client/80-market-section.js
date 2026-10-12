@@ -421,8 +421,20 @@ function createCommunitySection(ctx, form) {
       // 0.8.23：ref 赋值已上移到 cached 分支之前（缓存命中也要能触发按钮）
       // 0.5.5：串行尝试快照候选（每个 10s 超时），任一成功即秒级就绪；全部失败回退出厂快照/收割。
       // 0.8.7 R2：minBuiltAt 传入时跳过 72h 新鲜度检查，改为「builtAt 更新才接受」——供缓存命中后的后台静默刷新。
-      function trySnap(urls, minBuiltAt) {
-        if (cancelled || !urls || !urls.length) return Promise.resolve(false)
+      // 0.9.22：两处新鲜度补强（2026-10-12 实测 jsDelivr 三域名缓存分裂：主域已刷新版、fastly/gcore 滞后 ~12h 且带 38 条旧英文残留）——
+      //   ① 递归丢失 minBuiltAt 修复：原 trySnap(urls.slice(1)) 把刷新链路的 builtAt 下限丢掉，首个源被拒后
+      //      后续源无检查地接受，可能把已有缓存降级覆盖成更旧快照；现全参数透传。
+      //   ② 初始链路陈旧守卫：正常产出节奏 12h/版，builtAt 超 SNAP_STALE_MS 的源不再「首个 200 即接受」，
+      //      记为 bestStale 继续尝试下一个源；全源耗尽取 builtAt 最新的陈旧版兜底（仍优于出厂快照/直采）。
+      var SNAP_STALE_MS = 13 * 3600 * 1000
+      function trySnap(urls, minBuiltAt, bestStale) {
+        if (cancelled || !urls || !urls.length) {
+          if (minBuiltAt == null && bestStale && bestStale.data) {
+            var stS = catIdxFromSnapshot(bestStale.data, qualityOn, totalCount, CATIDX_SNAPSHOT_TTL_MS, npmChan, engineOn)
+            if (stS) { setCatIdx(stS); return Promise.resolve(true) }
+          }
+          return Promise.resolve(false)
+        }
         var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
         // 0.8.18：快照膨胀至 ~3.9MB（8313 条）后 10s 在大陆直连经常拉不完 → 60s；
         // URL 加 cache-busting 防桌面端 webview HTTP 缓存返回旧响应（旧 builtAt 会被 minBuiltAt 静默拒绝，表现为目录永远不更新）
@@ -434,6 +446,11 @@ function createCommunitySection(ctx, form) {
             if (cancelled) return false
             // R2 防护：catIdxFromSnapshot 会回写缓存，旧快照必须先于它拦截
             if (minBuiltAt != null && data && typeof data.builtAt === 'number' && data.builtAt <= minBuiltAt) return false
+            // 0.9.22：初始链路陈旧守卫——记住最新陈旧版并继续尝试下一个源（全源陈旧时用它兜底）
+            if (minBuiltAt == null && data && typeof data.builtAt === 'number' && Date.now() - data.builtAt > SNAP_STALE_MS) {
+              if (!bestStale || data.builtAt > (bestStale.builtAt || 0)) bestStale = { data: data, builtAt: data.builtAt }
+              return false
+            }
             var st = catIdxFromSnapshot(data, qualityOn, totalCount, minBuiltAt != null ? null : CATIDX_SNAPSHOT_TTL_MS, npmChan, engineOn)
             if (!st) return false
             setCatIdx(st)
@@ -443,7 +460,7 @@ function createCommunitySection(ctx, form) {
           .then(function (ok) {
             if (timer) clearTimeout(timer)
             if (ok) return true
-            return new Promise(function (r2) { setTimeout(r2, 300) }).then(function () { return trySnap(urls.slice(1)) })
+            return new Promise(function (r2) { setTimeout(r2, 300) }).then(function () { return trySnap(urls.slice(1), minBuiltAt, bestStale) })
           })
       }
       // 快照四级链路：localStorage 缓存(24h) → 在线快照(≤72h) → 出厂快照(内联+后台静默收割升级) → 分桶收割

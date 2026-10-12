@@ -115,7 +115,7 @@
 | P0 脚手架与调试通路 | ✅ 完成 | `--patch` 调试通路 + `--dump-config` 验证按原方案落地；主验证环境后来切换为本机 DSH Desktop 0.2.0-rc.2 本尊（宿主已升级） |
 | P1 设置卡片 | ✅ 完成 | 后演进为 plugins.bundle.config 页（0.2.2 对齐官方 WebSearchCard 模式），0.9.3 起分 3 组 |
 | P2 对话节点 | ✅ 完成 | 所见即所记走 `user/message` 事件，0.9.4 色条胶囊容器 |
-| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.15（列表视图标题重叠修复） |
+| P3 打包发布 | ✅ 完成 | tag 触发全自动流水线（v0.8.16 起）：build → npm publish → npmmirror sync → GitHub Release；当前 v0.9.22（快照新鲜度守卫） |
 | P4 生态入驻 | ⚠️ 部分变更 | dsh-plugin-hub 聚合页 ✅ 已建并每日构建；**awesome-dsh-plugin PR 作废**（用户决策 2026-09-30：市场唯一来源 = github.com/topics/dsh-plugin，不做外部渠道收录） |
 
 ### 立项后新增的能力（原方案未预见）
@@ -145,3 +145,4 @@
 - **列表视图标题重叠**（0.9.15 修复）：0.9.13 双行头部重构把 `.dcards-name` 从 head 的 flex 子项（自动块化，overflow/ellipsis 有效）移入 `namewrap` 普通块容器内变行内元素——CSS 裁剪属性对行内元素不生效，`white-space:nowrap` 长名横向溢出画到 ★ 星数与相邻描述列（列表视图行窄先暴露，网格视图长名同样中招）；修复 = `.dcards-name` 补 `display:block`。真机 DOM 断言：列表视图 50 个标题 overflowing 0。
 - **1.4 万口径缓存挤占**（0.9.20 修复）：hub 1.4.2 快照 13721 条（7.34MB）后，catidx 序列化 5.24M chars + zhmap 0.66M 同源共享 ~5.24M 配额必超，且旧降级链先写 catidx 会把 zhmap 挤掉（0.9.16 反英文固化保障真机实际失效）；修复 = catIdxCacheSave 重排（zhmap 优先写入，catidx 超限按设计放弃 + HTTP 缓存承接）。配套 UI 微修：0★ 弱化星标、desc tooltip 全覆盖、排队安装钮变灰、骨架 6→9、未翻译 chip 99+ 封顶；出厂快照刷新至 1.4.2 口径。真机验证：13608 条加载、分类漏斗「其他」0.9%、按钮对比度 ≥3.19、420/380px 单列、筛选 0.4ms。
 - **tx-cache 英文污染 + 市场英文残留**（0.9.21 修复）：hub translate-snapshot.mjs「LLM 无 CJK 译文时回写原文进缓存」把批次漏 key/截断的受害者永久标记为已译（实测 11180 条缓存中 52 条污染、37 条自然语言描述真机永久英文、★1/★0 长尾首屏不可见）；修复 = 无 CJK 不回写缓存（重试恢复）+ 清污染 + agnes 重翻 + 4 条纯产品名人工定译；配套客户端空描述/占位描述渲染弱化「暂无描述」兜底；出厂快照刷新至全中文口径（hub 13748 条）。全量审计 13650 条 = zh 6605 + 原文中文 5920 + 暂无描述 1125，enResidual=0（真机首屏/「其他」长尾/手翻样本三重断言）。运营坑：jsDelivr `@master` 引用缓存 12-24h，重要数据更新后须 purge.jsdelivr.net 主动清除。
+- **jsDelivr 镜像域缓存分裂 + trySnap 递归丢参**（0.9.22 修复）：purge.jsdelivr.net 只清主域，fastly/gcore.jsdelivr.net 镜像域不响应 purge 且缓存滞后 12-24h（发版后真机实测仍拉旧快照）；修复 = trySnap 多源候选加 builtAt 新鲜度守卫（SNAP_STALE_MS=13h，对齐 hub 02:30/14:30 双跑间隔），超龄源记 bestStale 继续试下一源、全源耗尽取最新陈旧版兜底；顺带修复递归调用 `trySnap(urls.slice(1))` 丢失 minBuiltAt 导致缓存被更旧快照降级覆盖。真机验证：伪造 30h 龄陈旧源注入候选首位，performance 资源记录证实「请求 200 后按 builtAt 拒绝」，最终加载新版。hub 侧配套：fetch-cards-snapshot.mjs v1.4.3 按 (full_name, npm) 统计 dup-extra，>1% 输出 CI `::warning::`（CI #44 重复行爆炸 ~2620 条的哨兵，不阻断）。

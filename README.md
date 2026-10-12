@@ -80,6 +80,7 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 - 数据通道：hub 每日 02:30/14:30 快照（jsDelivr）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；发版时内联出厂快照作离线首屏（**0.9.8 起按星裁剪：GitHub/both Top 1500，约 0.8MB；✏️ 0.9.20 起原料为 hub 1.4.2 新口径（无 npm-only 条目，`--npm-keep` 保留仅防御），出厂原料 13721 条 / 内联 0.77MB；完整目录打开市场后由在线链路自动补齐**，裁剪参数见 `scripts/assemble-client.cjs --keep/--npm-keep`）
 - 缓存配额适配（0.9.20）：1.4 万条目下 localStorage 同源共享配额（~5.24M chars）必超——`zhmap`（full_name→descZh 翻译映射）优先写入保住 0.9.16 反英文固化链路；catidx 全量缓存超限后按设计放弃持久化（旧缓存原子保留，jsDelivr HTTP 缓存承接重拉 + 重建 ~230ms 兜底）；容量探针 `scripts/verify-snapshot-capacity.cjs` 可复现实测
 - 中文全覆盖（0.9.21）：市场全部条目描述均为中文显示——CI 翻译 + 原文即中文 + 空描述/占位描述渲染弱化「暂无描述」（无英文残留入口，全量 13650 条审计 enResidual=0）；出厂快照刷新至全中文口径（hub 修复 tx-cache 英文污染后重建，重要数据更新后需 purge jsDelivr CDN 缓存）
+- 快照新鲜度守卫（0.9.22）：多源候选拉取校验 `builtAt`（SNAP_STALE_MS=13h，对齐 hub 02:30/14:30 双跑间隔）——jsDelivr fastly/gcore 镜像域不响应 purge、缓存滞后 12-24h，超龄源不再直接采用而继续尝试下一候选，全源耗尽取最新陈旧版兜底（离线可用性优先）；顺带修复 trySnap 递归调用丢失 `minBuiltAt` 导致缓存被更旧快照降级覆盖的问题
 - 界面文案只显示中文（EN 词典引用 ZH，完整走官方 locale 服务）
 
 ## License
