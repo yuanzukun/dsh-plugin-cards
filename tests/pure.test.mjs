@@ -359,14 +359,14 @@ test('fbPlanFor: github spec → 降级梯计划（tgz 镜像 + codeload 端点�
   assert.equal(p1.ghSpec, 'github:Ebony-Vinyl/dsh-our-free-model')
   assert.equal(p1.npmName, 'dsh-our-free-model')
   assert.equal(p1.tgzUrl, pure.TGZ_BASE + 'Ebony-Vinyl__dsh-our-free-model.tgz')
-  assert.equal(p1.cdlUrl, 'https://codeload.github.com/Ebony-Vinyl/dsh-our-free-model/tar.gz/HEAD')
+  assert.equal(p1.cdlUrl, 'https://codeload.github.com/Ebony-Vinyl/dsh-our-free-model/tar.gz/HEAD#.tar.gz')
   // 快照无 tgz 字段 → tgzUrl 空（梯子自动跳级）
   var p2 = pure.fbPlanFor({ full_name: 'o/r' }, 'github:o/r')
   assert.equal(p2.tgzUrl, '')
-  assert.equal(p2.cdlUrl, 'https://codeload.github.com/o/r/tar.gz/HEAD')
+  assert.equal(p2.cdlUrl, 'https://codeload.github.com/o/r/tar.gz/HEAD#.tar.gz')
   // item 缺失（自定义安装/队列）→ full_name 回退 spec 推导
   var p3 = pure.fbPlanFor(null, 'github:o/r.git')
-  assert.equal(p3.cdlUrl, 'https://codeload.github.com/o/r/tar.gz/HEAD')
+  assert.equal(p3.cdlUrl, 'https://codeload.github.com/o/r/tar.gz/HEAD#.tar.gz')
   // 非 github: spec → null（退化为原通道重试）
   assert.equal(pure.fbPlanFor({ tgz: 'x' }, 'dsh-plugin-cards'), null)
   assert.equal(pure.fbPlanFor({}, 'https://github.com/o/r'), null)
