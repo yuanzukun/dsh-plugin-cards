@@ -371,3 +371,22 @@ test('fbPlanFor: github spec → 降级梯计划（tgz 镜像 + codeload 端点�
   assert.equal(pure.fbPlanFor({ tgz: 'x' }, 'dsh-plugin-cards'), null)
   assert.equal(pure.fbPlanFor({}, 'https://github.com/o/r'), null)
 })
+test('netKeyFromChange: ChangeResult 原始 diagnostic 分类（0.9.24b 中文译文盲区修复）', () => {
+  // 预检 Empty reply（17:05 真机原文）→ github
+  assert.equal(pure.netKeyFromChange({ application: 'failed', error: { diagnostic: 'fatal: unable to access \'https://github.com/o/r/\': Empty reply from server' } }), 'github')
+  // Recv failure / 超时 / DNS → net 或 github
+  assert.equal(pure.netKeyFromChange({ error: { diagnostic: '\x1B[31mRecv failure: Connection was reset\x1B[0m' } }), 'net')
+  assert.equal(pure.netKeyFromChange({ error: { diagnostic: 'dsh: connection to github.com timed out after 20000ms' } }), 'github')
+  // 非网络类 / 无 diagnostic / 空值 → ''
+  assert.equal(pure.netKeyFromChange({ error: { diagnostic: 'ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION' } }), '')
+  assert.equal(pure.netKeyFromChange({ error: {} }), '')
+  assert.equal(pure.netKeyFromChange(null), '')
+  // 关键回归：中文译文本身不参与分类（分类只认原始 diagnostic）
+  assert.equal(pure.netKeyFromChange({ error: { diagnostic: '网络不稳定：连接 github.com 失败' } }), '')
+})
+test('classifyNetError: pnpm fetch 文案（真机三踩，0.9.24c）', () => {
+  // pnpm 抓 codeload tarball 重试耗尽后的原文（17:29 真机 operation-LJOjH6）
+  assert.equal(pure.classifyNetError('TimeoutError: The operation was aborted due to timeout'), 'net')
+  assert.equal(pure.classifyNetError('GET https://codeload.github.com/o/r/tar.gz/HEAD error (23). Will retry in 10 seconds.'), 'net')
+  assert.equal(pure.classifyNetError('安装 github:o/r失败：TimeoutError: The operation was aborted due to timeout（完整日志：…）'), 'net')
+})

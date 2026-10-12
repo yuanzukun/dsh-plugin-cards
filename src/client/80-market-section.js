@@ -860,12 +860,15 @@ function createCommunitySection(ctx, form) {
             //   ④⑤ 原通道重试 ×2（退避 0.8s / 3s）
             // 非 github: spec 无梯计划 → 退化为原通道重试 ×2；构建拦截不走本梯子（有专属授权重试行）。
             var fb = opts || {}
-            if (classifyNetError(m) && !fb.netFbDone) {
+            var netHit = (e && e.netKey) || classifyNetError(m) // 0.9.24b：ChangeResult 路径的分类随 Error 传递（译文正则认不出）
+            if (netHit && !fb.netFbDone) {
               var plan = fb.fbPlan || fbPlanFor(null, spec)
               var seq = fb.netSeq || 0 // 0=①npm 1=②tgz 2=③cdl 3/4=④⑤重试
               var retrySpec = plan ? plan.ghSpec : spec
               if (seq === 0 && plan) {
-                probeNpmCandidate(plan).then(function (npmName) {
+                // 0.9.24c：探测 promise 自身网络失败也要落到下一级（此前无 .catch → 梯子静默死亡，
+                // 真机嫌疑：NDF1Sc 超时后梯子无后续 op，探测挂了整条链就断了）
+                var probeGo = function (npmName) {
                   setTimeout(function () {
                     if (npmName) {
                       setMessage(T('mk.netFbTryNpm', { name: npmName }))
@@ -874,7 +877,8 @@ function createCommunitySection(ctx, form) {
                       installRef.current(spec, repoName, { netSeq: 1, fbPlan: plan })
                     }
                   }, 800)
-                })
+                }
+                probeNpmCandidate(plan).then(probeGo, function () { probeGo('') })
               } else if (seq === 1) {
                 if (plan && plan.tgzUrl) {
                   setTimeout(function () {
@@ -978,7 +982,14 @@ function createCommunitySection(ctx, form) {
      *  官方 UI 同款语义：「已安装，下次启动后加载」）。 */
     function checkChange(res, label) {
       if (!res || typeof res !== 'object') return ''
-      if (res.application === 'failed') throw new Error(T('mk.opFailLabel', { label: label }) + changeResultMessage(res))
+      if (res.application === 'failed') {
+        var e2 = new Error(T('mk.opFailLabel', { label: label }) + changeResultMessage(res))
+        // 0.9.24b：网络分类随 Error 传递——m 已被 changeResultMessage 翻成中文，
+        // catch 里 classifyNetError(m) 的英文正则认不出译文，梯子会整体跳过（17:05 真机踩坑：
+        // 预检 Empty reply → 中文报错「自动降级未成功」但梯子根本没跑）。这里从原始 diagnostic 重分类。
+        e2.netKey = netKeyFromChange(res)
+        throw e2
+      }
       if (res.application === 'cancelled') throw new Error(T('mk.opCancelled', { label: label }))
       return res.application || ''
     }

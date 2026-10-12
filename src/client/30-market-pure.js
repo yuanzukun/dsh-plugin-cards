@@ -736,6 +736,7 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     matchCat: matchCat, chipStyle: chipStyle, catChipStyle: catChipStyle, cliCmdFor: cliCmdFor, tabStyle: tabStyle,
     promoteActiveCat: promoteActiveCat, // 0.9.23：折叠态选中分类提位（40 块，声明提升可见）
     classifyNetError: classifyNetError, // 0.9.23：网络类预检错误分类（40 块，声明提升可见）
+    netKeyFromChange: netKeyFromChange, // 0.9.24b：ChangeResult 失败 → 网络分类（40 块）
     fbPlanFor: fbPlanFor, TGZ_BASE: TGZ_BASE, // 0.9.24：网络失败降级梯计划（tgz 镜像 + codeload 端点）
     npmCandidateFromGithubSpec: npmCandidateFromGithubSpec, // 0.9.24：github spec → npm 降级候选（40 块）
     verifyNpmCandidate: verifyNpmCandidate, // 0.9.24：npm 候选校验/防投毒（40 块）

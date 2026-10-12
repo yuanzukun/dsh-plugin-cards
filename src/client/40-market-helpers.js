@@ -49,11 +49,14 @@ function cliCmdFor(spec) {
  * github 键须排在 net 前——'connection to github.com timed out' 也含 'timed out after'。
  * 0.9.24 补 git CLI 文案（真机二次踩坑：预检通过后 clone 阶段报
  * 「fatal: unable to access 'https://github.com/x/y/': Recv failure: Connection was reset」，
- * 上一版只认 Node 错误码 ECONNRESET，git 人话文案漏匹配 → 天书直出）。 */
+ * 上一版只认 Node 错误码 ECONNRESET，git 人话文案漏匹配 → 天书直出）。
+ * 0.9.24c 补 pnpm fetch 文案（真机三踩：pnpm 抓 codeload tarball 中断重试耗尽后报
+ * 「TimeoutError: The operation was aborted due to timeout」——既非 Node 错误码也非 git 文案，
+ * 梯子整级没跑，用户白等 4 分钟 pnpm 重试周期后直接天书报错）。 */
 var NET_ERR_PATTERNS = [
   // github 键：消息里带 github.com 的连接失败（超时 / unable to access / Recv failure）
   { key: 'github', re: /connection to (?:[a-z0-9.-]+\.)*github\.com timed out|unable to access '[^']*github\.com[^']*'/i },
-  { key: 'net', re: /timed out after|Could not resolve host|getaddrinfo|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|Failed to connect|network (?:failure|unavailable)|Recv failure|Connection was reset|connection reset/i },
+  { key: 'net', re: /timed out after|aborted due to timeout|TimeoutError|error \(23\)|Could not resolve host|getaddrinfo|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|Failed to connect|network (?:failure|unavailable)|Recv failure|Connection was reset|connection reset/i },
 ]
 function classifyNetError(m) {
   var s = String(m == null ? '' : m)
@@ -61,6 +64,14 @@ function classifyNetError(m) {
     if (NET_ERR_PATTERNS[i].re.test(s)) return NET_ERR_PATTERNS[i].key
   }
   return ''
+}
+
+/** 0.9.24b：宿主 ChangeResult{application:'failed'} → 网络分类键（''=非网络类）。
+ *  必须从原始 diagnostic 分类——checkChange 抛出的 Error.message 已被 changeResultMessage
+ *  翻成中文人话，classifyNetError 的英文正则对译文必然 miss（17:05 真机踩坑：梯子整体跳过）。 */
+function netKeyFromChange(res) {
+  var diag = res && res.error && res.error.diagnostic ? String(res.error.diagnostic) : ''
+  return classifyNetError(diag.replace(/\x1B\[[0-9;]*[A-Za-z]/g, ''))
 }
 
 /** ---- 0.9.24：github spec → npm 降级候选（纯函数，配合 install 网络失败自动降级）----
