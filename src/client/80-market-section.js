@@ -62,6 +62,8 @@ function createCommunitySection(ctx, form) {
     var viewMode = viewModeState[0], setViewMode = viewModeState[1]
     var catState = useState('') // '' = 全部分类
     var activeCat = catState[0], setActiveCat = catState[1]
+    var catExpandState = useState(false) // 0.9.23：分类行折叠态（默认单行，「更多 ▾」展开全量）
+    var catExpand = catExpandState[0], setCatExpand = catExpandState[1]
     var subCatState = useState('') // 0.9.11 二级分类：'' = 子类·全部（仅 activeCat 有 subs 时有意义）
     var activeSub = subCatState[0], setSubCat = subCatState[1]
     // 0.5.4 全量精确统计：{ status:'loading'|'ready'|'error', done, total, items, counts, builtAt }
@@ -645,12 +647,12 @@ function createCommunitySection(ctx, form) {
     var queueRef = useRef([])
     var pumpTimerRef = useRef(null)
     var QUEUE_MAX = 20
-    var enqueueInstall = useCallback(function (spec, repoName) {
+    var enqueueInstall = useCallback(function (spec, repoName, fbPlan) {
       if (!spec) return
       if (queueRef.current.length >= QUEUE_MAX) return // 容量护栏
       if (activeOpRef.current && activeOpRef.current.spec === spec) return // 正在安装中的同一 spec 不入队
       for (var i = 0; i < queueRef.current.length; i++) { if (queueRef.current[i].spec === spec) return } // 去重：已在队列不重复入
-      queueRef.current = queueRef.current.concat([{ spec: spec, repoName: repoName || '', display: repoName || shortSpecName(spec) }])
+      queueRef.current = queueRef.current.concat([{ spec: spec, repoName: repoName || '', display: repoName || shortSpecName(spec), fbPlan: fbPlan || null }]) // 0.9.24：fbPlan 随队（降级梯需要条目级 tgz 信息）
       setInstallQueue(queueRef.current)
     }, [])
     var removeQueued = useCallback(function (idx) {
@@ -664,7 +666,7 @@ function createCommunitySection(ctx, form) {
       var next = q[0]
       queueRef.current = q.slice(1)
       setInstallQueue(queueRef.current)
-      installRef.current(next.spec, next.repoName)
+      installRef.current(next.spec, next.repoName, { fbPlan: next.fbPlan })
     }, [])
     var installRef = useRef(null) // pumpQueue → install 循环引用解法：install 定义后回填
 
@@ -803,7 +805,20 @@ function createCommunitySection(ctx, form) {
       })
     }
 
-    var install = useCallback(function (spec, repoName) {
+    /** 0.9.24：npm 渠道候选探测（jsDelivr CDN，CORS * 大陆可达；客户端已在用其拉快照）。
+     * 查 <name>@latest 的 package.json 并做仓库一致性校验（verifyNpmCandidate 防同名抢注）。
+     * 返回 npm 包名（候选可用）或 null（无候选/校验不过/探测失败）。 */
+    function probeNpmCandidate(cand) {
+      var ctrl = new AbortController()
+      var timer = setTimeout(function () { ctrl.abort() }, 8000)
+      return fetch('https://cdn.jsdelivr.net/npm/' + encodeURIComponent(cand.npmName) + '/package.json', { signal: ctrl.signal })
+        .then(function (r) { return r.ok ? r.json() : null })
+        .then(function (pkg) { return verifyNpmCandidate(pkg, cand.owner, cand.repo) ? cand.npmName : null })
+        .catch(function () { return null })
+        .then(function (x) { clearTimeout(timer); return x })
+    }
+
+    var install = useCallback(function (spec, repoName, opts) {
       setBusy(spec); clearMsg()
       var qPause = false // 0.9.6：队列泵暂停标记（失败/构建拦截时置 true，等用户处理后手动继续）
       var requestId = newUuid()
@@ -828,12 +843,63 @@ function createCommunitySection(ctx, form) {
         .catch(function (e) {
           var m = String((e && e.message) || e)
           var keys = extractBuildKeys(m)
+          var retryPlan = (opts && opts.fbPlan) || null // 0.9.24：降级梯随失败卡片（重试按钮续用完整梯计划）
+          var retrySpec0 = retryPlan ? retryPlan.ghSpec : spec
           qPause = true // 0.9.6：失败/构建拦截 → 队列暂停（结果卡片/授权重试行需要用户看见并处理）
           if (keys.length) {
             setPendingBuilds({ spec: spec, keys: keys })
             finishOp('warn', T('mk.buildBlocked'), null)
           } else {
-            finishOp('fail', T('mk.installFailed') + m, { spec: spec, repoName: repoName }) // 0.9.6：失败卡片带重试（构建拦截走专属授权重试行，不给裸重试）
+            finishOp('fail', T('mk.installFailed') + friendlyManageError({ message: m }), { spec: retrySpec0, repoName: repoName, fbPlan: retryPlan }) // 0.9.6：失败卡片带重试（构建拦截走专属授权重试行，不给裸重试）；0.9.23：网络类天书换人话；0.9.24：retry 带降级梯计划
+            // 0.9.24：网络类失败自动降级梯（不开 VPN 也要能装）——
+            // 真机取证：直连 github.com 主站间歇劣化（时通时断），预检侥幸通过 ≠ 后续 git clone 能撑住。
+            // 梯子每级只试一次，netSeq 严格递增防循环：
+            //   ① npm 同名探测（jsDelivr；宿主 npm 通道带 npmmirror 兜底）→ 命中换 npm 装（netFbDone 止梯）
+            //   ② hub 镜像 tarball（P2 池产物，jsDelivr 国内可达；快照无 tgz 字段自动跳过）
+            //   ③ codeload tarball URL（实测与 github.com 主站不同网络路径，主站被 RST 时常可通）
+            //   ④⑤ 原通道重试 ×2（退避 0.8s / 3s）
+            // 非 github: spec 无梯计划 → 退化为原通道重试 ×2；构建拦截不走本梯子（有专属授权重试行）。
+            var fb = opts || {}
+            if (classifyNetError(m) && !fb.netFbDone) {
+              var plan = fb.fbPlan || fbPlanFor(null, spec)
+              var seq = fb.netSeq || 0 // 0=①npm 1=②tgz 2=③cdl 3/4=④⑤重试
+              var retrySpec = plan ? plan.ghSpec : spec
+              if (seq === 0 && plan) {
+                probeNpmCandidate(plan).then(function (npmName) {
+                  setTimeout(function () {
+                    if (npmName) {
+                      setMessage(T('mk.netFbTryNpm', { name: npmName }))
+                      installRef.current(npmName, repoName || plan.repo, { netFbDone: true })
+                    } else {
+                      installRef.current(spec, repoName, { netSeq: 1, fbPlan: plan })
+                    }
+                  }, 800)
+                })
+              } else if (seq === 1) {
+                if (plan && plan.tgzUrl) {
+                  setTimeout(function () {
+                    setMessage(T('mk.netFbTryTgz', { name: plan.repo }))
+                    installRef.current(plan.tgzUrl, repoName || plan.repo, { netSeq: 2, fbPlan: plan })
+                  }, 800)
+                } else {
+                  installRef.current(spec, repoName, { netSeq: 2, fbPlan: plan })
+                }
+              } else if (seq === 2) {
+                if (plan && plan.cdlUrl) {
+                  setTimeout(function () {
+                    setMessage(T('mk.netFbTryCdl', { repo: plan.repo }))
+                    installRef.current(plan.cdlUrl, repoName || plan.repo, { netSeq: 3, fbPlan: plan })
+                  }, 800)
+                } else {
+                  installRef.current(spec, repoName, { netSeq: 3, fbPlan: plan })
+                }
+              } else if (seq < 5 && (plan ? true : seq < 2)) { // 有梯：④⑤ 两级重试；无梯：仅两级重试
+                setTimeout(function () {
+                  setMessage(T('mk.netFbRetry', { spec: retrySpec }))
+                  installRef.current(retrySpec, repoName, { netSeq: seq + 1, fbPlan: plan })
+                }, seq === 3 ? 800 : 3000)
+              }
+            }
           }
           return refreshInstalled() // 失败也要刷新已安装区块（宿主可能已落地部分状态）
         })
@@ -850,6 +916,12 @@ function createCommunitySection(ctx, form) {
     /** 宿主管理操作错误 → 面板友好文案（源码错误码：stop-profile / bundle-in-use / not-removable / management-required）。 */
     function friendlyManageError(e) {
       var m = String((e && e.message) || e)
+      // 0.9.23：网络类预检失败先行识别（此前英文天书直出——desktop/web 双端真机踩坑 2026-10-12）
+      var netKey = classifyNetError(m)
+      if (netKey === 'github') return T('mk.errNetGithub')
+      if (netKey === 'net') return T('mk.errNet')
+      // 0.9.23：宿主 ChangeResult 的 kind 键（classifyInstallFailure 产物）直接命中网络类
+      if (m === 'network' || m === 'timeout') return T('mk.errNet')
       if (m.indexOf('already-installed') !== -1) return T('mk.errAlreadyInstalled')
       // 0.9.7：pnpm 11 默认 24h 新包冷却拦截（装完刚发布的版本再卸载/更新必踩）→ 原因 + 自救，替代天书
       if (m.indexOf('ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION') !== -1 || m.indexOf('minimumReleaseAge cutoff') !== -1) {
@@ -875,6 +947,10 @@ function createCommunitySection(ctx, form) {
           var flagged = (/\n\s+(\S+@\S+) was published at/.exec(text) || [])[1] || ''
           return T('mk.errMinAge', { pkg: flagged || '?' }) + T('mk.errMinAgeFix') + T('mk.fullLog')
         }
+        // 0.9.23：网络类预检失败优先短路——GitHub 5s 连接探测 / registry 超时 / DNS 失败
+        // 的原始行对用户无 actionable 信息，换人话 + 自救（重试/查代理/CLI）
+        var netKeyDiag = classifyNetError(text)
+        if (netKeyDiag) return T(netKeyDiag === 'github' ? 'mk.errNetGithub' : 'mk.errNet') + T('mk.fullLog')
         var lines = text.split('\n')
         var picked = ''
         for (var i = lines.length - 1; i >= 0; i--) {
@@ -983,7 +1059,7 @@ function createCommunitySection(ctx, form) {
           if (ctx3.failedEnables.length) finishOp('warn', T('mk.installedEnableFailed', { spec: p.spec, list: ctx3.failedEnables.join('；') }), null)
           else finishOp('ok', T(ctx3.app === 'restart-required' ? 'mk.grantedOkRestart' : 'mk.grantedOk', { spec: p.spec }), null)
         })
-        .catch(function (e) { finishOp('fail', T('mk.installFailed') + String((e && e.message) || e), { spec: p.spec, repoName: '' }) })
+        .catch(function (e) { finishOp('fail', T('mk.installFailed') + friendlyManageError(e), { spec: p.spec, repoName: '' }) }) // 0.9.23：网络类天书换人话（与 install 主链同款）
         .then(function () { setBusy(''); endOp() })
     }, [pm, refreshInstalled, pendingBuilds, beginOp, stepOp, endOp, clearMsg, finishOp])
 
@@ -1132,6 +1208,10 @@ function createCommunitySection(ctx, form) {
       (tab === 'market' && (syncChip || osyncBtn)) ? jsx('div', { key: 'tabs-right', style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }, children: [syncChip, sbtn, osyncBtn] }) : null,
     ] })
 
+    // 0.9.23：折叠态选中分类提位——chips 按条数降序，低频分类被选中时高亮 chip 藏进折叠区、状态反馈丢失；
+    // 折叠时把 active chip 移到「全部」后保证首行恒可见（展开态保持计数降序不动）
+    var chipsShown = catExpand ? catChips : promoteActiveCat(catChips, activeCat)
+
     return jsx('div', { style: SECTION_WRAP, children: [
       jsx('style', { key: 'css', dangerouslySetInnerHTML: { __html: MARKET_CSS } }),
       // 0.9.12 P1：Tabs + 搜索行吸顶——长列表滚动时筛选不丢；滚动容器非本区块时 sticky 自动退化为常态布局
@@ -1147,31 +1227,40 @@ function createCommunitySection(ctx, form) {
           value: query,
           onChange: function (e) { setQuery(e.target.value) },
         }),
-        jsx('button', { key: 'sort', style: chipStyle(sortBy === 'updated'), title: T('mk.sortTip'),
+        jsx('button', { key: 'sort', style: Object.assign(chipStyle(sortBy === 'updated'), { height: '26px', boxSizing: 'border-box' }), title: T('mk.sortTip'), // 0.9.23：与 ghost 按钮/搜索框 26px 统一（审计①：chip 按钮 22px vs ghost 26px 混排）
           onClick: function () { setSortBy(sortBy === 'updated' ? 'stars' : 'updated') },
           children: sortBy === 'updated' ? T('mk.sortUpdated') : T('mk.sortStars') }),
-        jsx('button', { key: 'starchip', style: chipStyle(starMin > 0), title: T('mk.starTip'),
+        jsx('button', { key: 'starchip', style: Object.assign(chipStyle(starMin > 0), { height: '26px', boxSizing: 'border-box' }), title: T('mk.starTip'),
           onClick: function () { setStarMin(starMin === 0 ? 10 : (starMin === 10 ? 50 : 0)); setViewPage(1) },
           children: starMin === 0 ? T('mk.starAll') : T('mk.starMin', { n: starMin }) }),
         jsx('button', { key: 'refresh', style: Object.assign({}, BTN_GHOST_STYLE, { whiteSpace: 'nowrap', flexShrink: 0 }), disabled: paging, onClick: function () { load(page) }, children: paging ? T('mk.loading') : T('mk.refresh') }),
         // 0.9.12 P2：网格/列表视图切换（记忆于 localStorage）
         jsx('span', { key: 'viewtoggle', style: { display: 'inline-flex', flexShrink: 0 }, children: [
-          jsx('button', { key: 'vg', title: T('mk.viewTip'), style: Object.assign(chipStyle(viewMode === 'grid'), { borderRadius: '6px 0 0 6px' }),
+          jsx('button', { key: 'vg', title: T('mk.viewTip'), style: Object.assign(chipStyle(viewMode === 'grid'), { borderRadius: '6px 0 0 6px', height: '26px', boxSizing: 'border-box' }),
             onClick: function () { setViewMode('grid'); try { localStorage.setItem(VIEW_KEY, 'grid') } catch (eVg) {} }, children: T('mk.viewGrid') }),
-          jsx('button', { key: 'vl', title: T('mk.viewTip'), style: Object.assign(chipStyle(viewMode === 'list'), { borderRadius: '0 6px 6px 0' }),
+          jsx('button', { key: 'vl', title: T('mk.viewTip'), style: Object.assign(chipStyle(viewMode === 'list'), { borderRadius: '0 6px 6px 0', height: '26px', boxSizing: 'border-box' }),
             onClick: function () { setViewMode('list'); try { localStorage.setItem(VIEW_KEY, 'list') } catch (eVl) {} }, children: T('mk.viewList') }),
         ] }),
         // 0.9.14 P1-3：未翻译弱提示（本页英文描述未译出时才显示；点击重置停用通道并重试）
+        // 0.9.23：明示退避状态（审计③：MyMemory 429 限流后用户只看到计数、不知会自动重试）——退避中显示剩余分钟
         txMissingN > 0 ? jsx('button', { key: 'txmissing', style: Object.assign({}, BTN_GHOST_STYLE, { whiteSpace: 'nowrap', flexShrink: 0, opacity: 0.75 }),
-          title: T('mk.txMissingTip', { n: txMissingN }),
+          title: (function () {
+            var left = txQuotaRef.current.until - Date.now()
+            return T('mk.txMissingTip', { n: txMissingN, m: left > 0 ? Math.max(1, Math.round(left / 60000)) : 0 })
+          })(),
           onClick: function () { llmDownRef.current = false; txQuotaRef.current = { until: 0, tries: 0 }; setTxRetry(function (v) { return v + 1 }) },
           children: T('mk.txMissing', { n: txMissingN > 99 ? '99+' : txMissingN }) }) : null, // 2026-10-11 审计⑤：计数 99+ 封顶防数字跳动（title 保留精确数）
       ] }) : null,
       ] }),
       tab === 'market' && catChips.length ? jsx('div', { key: 'filterbar', className: 'dcards-filterbar', children: [
-        jsx('div', { key: 'cats', className: 'dcards-chiprow', children: [ // 0.9.10：自适应换行（自动排列铺满行宽），不做强制横滚
+        // 0.9.23：分类行默认单行折叠（审计②：2 行 69px 常驻把首屏卡片推低 ~46px）——「更多 ▾」展开全量；
+        // 窄屏（≤480px）整块 chips 换成下拉选择器（审计⑤：420px 下分类+子类 chip 墙 432px，内容被推到两屏外）
+        jsx('div', { key: 'cats', className: 'dcards-chiprow dcats-chipwrap' + (catExpand ? '' : ' dcats-collapsed'), children: [ // 0.9.10：自适应换行（自动排列铺满行宽），不做强制横滚
           jsx('span', { key: 'clabel', className: 'dcards-rowlabel', children: T('mk.catLabel') }),
-          catChips.map(function (chip) {
+          jsx('button', { key: 'catmore', className: 'dcards-morebtn',
+            onClick: function () { setCatExpand(!catExpand) },
+            children: catExpand ? T('mk.catLess') : T('mk.catMore') }),
+          chipsShown.map(function (chip) { // 0.9.23：折叠态为提位序（active 恒在首行），展开态为计数降序原序
             var text = chip.value === ''
               ? chip.display + '（' + chip.count + '）'
               : chip.exact !== null
@@ -1190,8 +1279,20 @@ function createCommunitySection(ctx, form) {
             })
           })
         ] }),
+        // 0.9.23：窄屏分类下拉（宽屏 CSS 隐藏）——与上方 chips 行数据同源
+        jsx('div', { key: 'catsel', className: 'dcards-catsel', children: [
+          jsx('span', { key: 'clabel2', className: 'dcards-rowlabel', children: T('mk.catLabel') }),
+          jsx('select', { key: 'catselmain', value: activeCat,
+            onChange: function (e) { setActiveCat(e.target.value); setSubCat(''); setViewPage(1) },
+            children: catChips.map(function (chip) {
+              var text = chip.value === ''
+                ? chip.display + '（' + chip.count + '）'
+                : chip.exact !== null ? chip.display + '（' + chip.exact + '）' : chip.display
+              return jsx('option', { key: 'co-' + chip.value, value: chip.value, children: text })
+            }) }),
+        ] }),
         // 0.9.11 二级分类：选中父类且有子类定义时，浮出子类行（与父类 AND 过滤；取消父类即收起）
-        (activeCat && subsOf(activeCat) && idxReady) ? jsx('div', { key: 'subcats', className: 'dcards-chiprow', children: [
+        (activeCat && subsOf(activeCat) && idxReady) ? jsx('div', { key: 'subcats', className: 'dcards-chiprow dcats-chipwrap', children: [
           jsx('span', { key: 'slabel', className: 'dcards-rowlabel', children: T('mk.subLabel') }),
           (function () {
             var sc = subCounts[activeCat] || {}
@@ -1211,6 +1312,24 @@ function createCommunitySection(ctx, form) {
             })
           })(),
         ] }) : null,
+        // 0.9.23：窄屏子类下拉（与上方子类 chips 行数据同源，宽屏隐藏）
+        (activeCat && subsOf(activeCat) && idxReady) ? jsx('div', { key: 'subsel', className: 'dcards-catsel', children: (function () {
+          var sc = subCounts[activeCat] || {}
+          var chips = [{ label: '', display: T('mk.subAll'), count: catCounts[activeCat] || 0 }]
+          var subs = subsOf(activeCat).slice().sort(function (a, b) { return (sc[b.label] || 0) - (sc[a.label] || 0) })
+          for (var i = 0; i < subs.length; i++) {
+            var n = sc[subs[i].label] || 0
+            if (n > 0 || activeSub === subs[i].label) chips.push({ label: subs[i].label, display: subs[i].label, count: n })
+          }
+          return [
+            jsx('span', { key: 'slabel2', className: 'dcards-rowlabel', children: T('mk.subLabel') }),
+            jsx('select', { key: 'subselmain', value: activeSub,
+              onChange: function (e) { setSubCat(e.target.value); setViewPage(1) },
+              children: chips.map(function (schip) {
+                return jsx('option', { key: 'so-' + schip.label, value: schip.label, children: schip.display + '（' + schip.count + '）' })
+              }) }),
+          ]
+        })() }) : null,
         // 0.9.12 P0：scope 说明两行并一行——常驻只留摘要，完整两行说明收进 title tooltip（省 ~34px 纵向）
         jsx('div', { key: 'scope', title: (function () {
           var l1 = idxReady
@@ -1278,7 +1397,7 @@ function createCommunitySection(ctx, form) {
         ((lastResult.kind === 'fail' && lastResult.step && lastResult.step !== 'prepare') || lastResult.exitCode || lastResult.retry) ? jsx('div', { key: 'meta', style: { marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', color: 'var(--dsw-alias-label-tertiary)' }, children: [
           lastResult.kind === 'fail' && lastResult.step && lastResult.step !== 'prepare' ? jsx('span', { key: 'fs', children: T('mk.rsFailedAt', { step: T(STEP_LABEL[lastResult.step] || lastResult.step) }) }) : null,
           lastResult.exitCode ? jsx('span', { key: 'ex', children: T('mk.rsExit', { code: lastResult.exitCode }) }) : null,
-          lastResult.retry ? jsx('button', { key: 'rt', style: Object.assign({}, BTN_GHOST_STYLE, { padding: '1px 10px', fontSize: '12px', flexShrink: 0 }), onClick: function () { var r = lastResult.retry; if (r) install(r.spec, r.repoName) }, title: T('mk.rsRetryTip'), children: T('mk.rsRetry') }) : null,
+          lastResult.retry ? jsx('button', { key: 'rt', style: Object.assign({}, BTN_GHOST_STYLE, { padding: '1px 10px', fontSize: '12px', flexShrink: 0 }), onClick: function () { var r = lastResult.retry; if (r) install(r.spec, r.repoName, { fbPlan: r.fbPlan }) }, title: T('mk.rsRetryTip'), children: T('mk.rsRetry') }) : null,
         ] }) : null,
       ] }) : null,
       // 0.9.6：安装队列区（批量安装：排队行 + 暂停时亮「继续安装」；运行中由队列泵自动推进）
@@ -1428,6 +1547,7 @@ function createCommunitySection(ctx, form) {
               setConfirmInst({
                 spec: spec, name: repo || item.name, href: href, cli: cliCmdFor(spec),
                 gitOnly: item.source === 'github' || !item.npm,
+                fbPlan: fbPlanFor(item, spec), // 0.9.24：网络失败降级梯计划（tgz 镜像 + codeload 端点）
               })
             },
             children: busy === spec ? T('mk.installing') : queuedInst ? T('mk.queuedBadge') : T('mk.install'),
@@ -1628,8 +1748,8 @@ function createCommunitySection(ctx, form) {
                 title: busy !== '' ? T('mk.queueAddTip') : T('mk.directInstallTip'),
                 onClick: function () {
                   var c = confirmInst; setConfirmInst(null)
-                  if (busy !== '') enqueueInstall(c.spec, c.name) // 0.9.6：有操作进行中 → 入队串行执行
-                  else install(c.spec, c.name)
+                  if (busy !== '') enqueueInstall(c.spec, c.name, c.fbPlan) // 0.9.6：有操作进行中 → 入队串行执行
+                  else install(c.spec, c.name, { fbPlan: c.fbPlan })
                 }, children: busy !== '' ? T('mk.queueAdd') : T('mk.directInstall') }),
             ] }),
           ] }),

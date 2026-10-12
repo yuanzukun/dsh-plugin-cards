@@ -56,9 +56,11 @@ var ZH = {
   'mk.viewGrid': '网格',
   'mk.viewList': '列表',
   'mk.viewTip': '切换目录视图（网格 / 列表）',
-  'mk.txMissing': '⚠ {n} 条未翻译',
+  'mk.txMissing': '⚠ {n} 条待译',
   'mk.noDesc': '暂无描述',
-  'mk.txMissingTip': '本页有 {n} 条英文描述未译出（翻译通道之前失败或配额耗尽，已被本轮停用）；点击重置通道并重试。翻译按页懒执行：翻到哪页译哪页',
+  'mk.txMissingTip': '本页有 {n} 条英文描述未译出（免费翻译通道限流 429，指数退避中，约 {m} 分钟后自动重试）；点击立即重置通道重试。翻译按页懒执行：翻到哪页译哪页',
+  'mk.catMore': '更多 ▾',
+  'mk.catLess': '收起 ▴',
   'mk.loadMore': '加载更多（剩 {n}）',
   'mk.zeroStarTip': '暂无 star（社区热度信号缺失，排序按更新时间与规范合规分兜底）',
   // ---- 数据源 / 同步 ----
@@ -283,6 +285,19 @@ var ZH = {
   'mk.errNotRemovable': '该 bundle 不允许卸载（profile 内置依赖或受宿主保护）',
   'mk.errManaged': '该 bundle 受宿主管理保护，不允许在面板操作',
   'mk.errNoDetail': '宿主返回失败但无错误详情',
+  // 0.9.23：网络类预检失败友好化——此前宿主英文原文直出（2026-10-12 真机取证：desktop 14:12 /
+  // web 14:17 双端踩「connection to github.com timed out after 5000ms」，git 来源插件安装
+  // 被 5s GitHub 连接预检拒绝，用户看到的是天书），给原因 + 自救 + 重试引导
+  // 0.9.24：文案改为「已自动降级」语境——失败后客户端自动走 npm 渠道（宿主 npm 通道带
+  // npmmirror 兜底，大陆稳定）或自动重试，此处文案仅在降级链穷尽后展示
+  'mk.errNetGithub': '网络不稳定：连接 github.com 失败（超时 / 连接被重置），且自动降级未成功（npm 渠道无同名包或重试仍失败）。可点「重试」再试；若该插件在 npm 有包，也可在「自定义安装」直接填 npm 包名绕过 GitHub 克隆。',
+  'mk.errNet': '网络不稳定（连接超时 / DNS 解析失败 / 连接被重置），且自动降级未成功。可点「重试」再试；若该插件在 npm 有包，可在「自定义安装」直接填 npm 包名绕过 GitHub。',
+  // 0.9.24：github 克隆网络失败自动降级链提示（npm 渠道探测 / 原通道重试）
+  'mk.netFbTryNpm': 'GitHub 连接不稳定，自动切换 npm 渠道安装：{name}（npm 版本可能略滞后于仓库）…',
+  'mk.netFbTryTgz': 'npm 渠道未命中，改走镜像压缩包安装：{name}（镜像版本可能滞后于仓库最新提交）…',
+  'mk.netFbTryCdl': '镜像不可用，改走 GitHub tarball 直连通道安装：{repo}…',
+  'mk.netFbRetry': '网络抖动，自动重试安装：{spec}…',
+  'mk.netFbProbeFail': 'npm 渠道探测未命中（无同名包或校验不过），尝试原通道重试…',
   // 0.9.7：pnpm 11 默认 24h 供应链冷却（minimum-release-age）拦截——实测锁文件重校验不看 exclude 豁免，
   // 「装完刚发布的版本再卸载/更新」必踩；给原因 + 可执行自救，替代天书报错
   'mk.errMinAge': 'pnpm 11 供应链保护拦截：{pkg} 发布不足 24 小时，卸载/更新时会重校验整个 lockfile（该检查不受 exclude 豁免）。',

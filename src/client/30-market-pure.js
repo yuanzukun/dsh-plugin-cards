@@ -40,10 +40,10 @@ var PAGE_SIZES = [20, 50, 100]
 var MARKET_CSS = [
   // 官方规则（practices.md UI）：样式仅引用 --dsw-alias-* 主题 token，字面色仅限艺术图（徽章色板在 JS 侧）。
   // 0.9.12 asar 取证：宿主无 shadow/elevation 类 token → 卡片 hover 阴影保留字面 rgba（唯一例外，两类主题下均为中性灰可接受）。
-  '.dcards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}',
-  '.dcards-card{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1);transition:border-color .15s ease,box-shadow .18s ease,transform .18s ease;}',
+  '.dcards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}', // 0.9.23：实测 178px 3 列不可行——avatar(30)+★(~50) 固定占 88px，namewrap 仅剩 59px 标题/副行全截断；回退 2 列 277px，保留紧凑化（avatar 30 + padding 8/10）让 namewrap 154→166px
+  '.dcards-card{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1);box-shadow:0 1px 3px rgba(31,39,51,.06);transition:border-color .15s ease,box-shadow .18s ease,transform .18s ease;}', // 0.9.23：常驻 subtle 阴影（审计⑥：浅色下卡面与页面同白仅 1px 边框区分）+ padding 10/12→8/10 配合 3 列窄卡（178px 下 namewrap +8px）
   '.dcards-card:hover{border-color:var(--dsw-alias-border-l3);box-shadow:0 6px 16px rgba(31,39,51,.12);transform:translateY(-2px);}',
-  '.dcards-avatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;line-height:1;color:var(--dsw-alias-label-primary-inverted);flex-shrink:0;user-select:none;}', // 0.9.13：26px 淡底圆 → 38px 分类色实底圆角方块（视觉锚点）
+  '.dcards-avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;line-height:1;color:var(--dsw-alias-label-primary-inverted);flex-shrink:0;user-select:none;}', // 0.9.23：38→30px 配合 3 列窄卡（视觉锚点保留，为 namewrap 让 8px；列表视图有独立 34px 覆盖不受影响）
   '.dcards-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;}',
   '.dcards-name{display:block;font-weight:600;font-size:14px;color:var(--dsw-alias-label-primary);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}', // 0.9.15：补 display:block——0.9.13 移入 namewrap 后变行内元素，overflow/ellipsis 失效致长名溢出画到 ★/描述上（真机截图实锤）
   '.dcards-name:hover{color:var(--dsw-alias-brand-primary);}',
@@ -57,8 +57,12 @@ var MARKET_CSS = [
   '@keyframes dcards-shim{to{background-position:-200% 0;}}',
   '.dcards-pagebar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:10px 0 2px;font-size:12px;color:var(--dsw-alias-label-secondary);}',
   '.dcards-pagebar select{padding:2px 6px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;font-size:12px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);}',
+  '.dcards-catsel{display:none;align-items:center;gap:6px;}', // 0.9.23：窄屏分类下拉（替代 chips 墙）
+  '.dcards-catsel select{flex:1;min-width:0;padding:3px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;font-size:12px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);height:26px;}',
   '.dcards-filterbar{background:var(--dsw-alias-bg-layer-2);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:8px;}',
   '.dcards-chiprow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
+  '.dcards-chiprow.dcats-collapsed{max-height:30px;overflow:hidden;}', // 0.9.23：分类行默认单行折叠（30px≈单行 chip 高），「更多 ▾」展开全量——首屏卡片前移 ~46px（真机审计②：2 行 69px 常驻 + 子类 44px）
+  '.dcards-morebtn{flex:0 0 auto;padding:1px 8px;border-radius:11px;font-size:11px;cursor:pointer;border:1px dashed var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);white-space:nowrap;}', // 0.9.23：折叠切换钮（虚线弱化，区别于实体 chip）
   '.dcards-chiprow>button{white-space:nowrap;flex:0 0 auto;}',
   '.dcards-chiprow.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;}',
   '.dcards-chiprow.scroll>button{flex:0 0 auto;}',
@@ -93,6 +97,8 @@ var MARKET_CSS = [
   '.dcards-list .dcards-avatar{width:34px;height:34px;font-size:15px;border-radius:8px;}',
   // 480px 以下（设置弹窗 ~465px 内容区）：单列 + 描述 2 行，根治 220px 双列小卡头部折行
   '@media (max-width:480px){.dcards-grid{grid-template-columns:1fr;gap:8px;}.dcards-desc{-webkit-line-clamp:2;min-height:36px;}}',
+  // 0.9.23：窄屏分类 chips 墙 → 下拉选择器（真机审计⑤：420px 下分类 291px + 子类 141px 占首屏，内容被推到两屏外）
+  '@media (max-width:480px){.dcats-chipwrap{display:none;}.dcards-catsel{display:flex;}}',
 ].join('')
 
 /** 目录条目 → 安装 spec：npm 项原样作 npm 包名（0.6.0，宿主对非 github: 字符串走 npm 安装）；
@@ -228,7 +234,12 @@ function classifyItem(item) {
     }
   }
   // 0.9.11 漏斗修补：dsh-/_ 前缀命名的仓库几乎必属 DSH 生态，别漏进「其他」（实测其他 682 条中大量此类）
-  if (/^dsh[-_]/i.test(item.name || '')) return '框架与宿主集成'
+  // 0.9.23 全量审计修正（13668 条）：原测 item.name——npm scoped 镜像名会覆盖 name（@owner/dsh-xxx，
+  // 实测 619 条面 / 564 条仓库段实为 dsh- 开头），@ 开头永不命中前缀 → 37 条漏进「其他」（占该桶 30%）；
+  // 另有 dedup 胜出包名无 dsh- 前缀形态（dsh-reasoning-slider→name=reasoning-slider）。改测 full_name
+  // 仓库段（GitHub 仓库名恒定，两形态同治）。
+  var repoSeg = String(item.full_name || item.name || '').split('/').pop() || ''
+  if (/^dsh[-_]/i.test(repoSeg)) return '框架与宿主集成'
   return CATEGORY_OTHER
 }
 
@@ -413,6 +424,9 @@ var SNAPSHOT_URLS = [
   'https://fastly.jsdelivr.net/gh/yuanzukun/dsh-plugin-hub@master/public/cards-snapshot.json',
   'https://gcore.jsdelivr.net/gh/yuanzukun/dsh-plugin-hub@master/public/cards-snapshot.json',
 ]
+/** 0.9.24 P2：hub tgz 镜像池基址（Zotero 中文社区模式——hub CI 预构建 github 独源插件 tarball
+ * 入仓库 public/tgz/，随快照同走 jsDelivr 国内可达分发）。须定义在本块导出之前（var 赋值不提升）。 */
+var TGZ_BASE = SNAPSHOT_URLS[0].replace('cards-snapshot.json', 'tgz/')
 function snapshotUrlCandidates() {
   var urls = SNAPSHOT_URLS.slice()
   try {
@@ -720,5 +734,10 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     unwrapRpc: unwrapRpc, extractBuildKeys: extractBuildKeys, cmpVersion: cmpVersion,
     relTime: relTime, fmtStamp: fmtStamp, rtverPartition: rtverPartition,
     matchCat: matchCat, chipStyle: chipStyle, catChipStyle: catChipStyle, cliCmdFor: cliCmdFor, tabStyle: tabStyle,
+    promoteActiveCat: promoteActiveCat, // 0.9.23：折叠态选中分类提位（40 块，声明提升可见）
+    classifyNetError: classifyNetError, // 0.9.23：网络类预检错误分类（40 块，声明提升可见）
+    fbPlanFor: fbPlanFor, TGZ_BASE: TGZ_BASE, // 0.9.24：网络失败降级梯计划（tgz 镜像 + codeload 端点）
+    npmCandidateFromGithubSpec: npmCandidateFromGithubSpec, // 0.9.24：github spec → npm 降级候选（40 块）
+    verifyNpmCandidate: verifyNpmCandidate, // 0.9.24：npm 候选校验/防投毒（40 块）
   }
 }

@@ -89,6 +89,18 @@ test('classifyItem: topics 优先、kw 兜底、dsh- 前缀漏斗、其他收尾
   assert.equal(pure.classifyItem({ name: 'zzz', description: 'a stock market ticker' }), '其他') // 0.9.11b: market kw 已收窄为插件市场
   assert.equal(pure.classifyItem({ name: 'c', description: 'awesome list of plugins' }), '合集与市场')
 })
+test('classifyItem: dsh- 前缀兜底测 full_name 仓库段（0.9.23 审计修正：npm scoped 名覆盖 name 不再漏网）', () => {
+  // 形态①：npm scoped 镜像名覆盖 name（@owner/dsh-xxx，真机审计 37 条漏网样本）
+  assert.equal(pure.classifyItem({ full_name: 'weibaohui/dsh-thinktank', name: '@weibaohui/dsh-thinktank', description: '思维模型全方位分析库' }), '框架与宿主集成')
+  // 形态②：dedup 胜出包名无 dsh- 前缀（dsh-reasoning-slider → name=reasoning-slider）
+  assert.equal(pure.classifyItem({ full_name: 'qjcnmd/dsh-reasoning-slider', name: 'reasoning-slider', description: '' }), '框架与宿主集成')
+  // 原形态保持：无 full_name 时 name 顶上
+  assert.equal(pure.classifyItem({ name: 'dsh-usage-badge' }), '框架与宿主集成')
+  // 边界不误收：dsh 后无 -/_ 分隔（DSHdesktop / dshplugin / 纯 DSH）不算前缀
+  assert.equal(pure.classifyItem({ full_name: 'TixAn9/DSHdesktop-restart-bottom', name: 'DSHdesktop-restart-bottom', description: '给桌面写的重启插件' }), '其他')
+  assert.equal(pure.classifyItem({ full_name: 'toustifer/dshplugin', name: 'dshplugin', description: '' }), '其他')
+  assert.equal(pure.classifyItem({ full_name: 'Sean-Gao/DSH', name: 'DSH', description: '' }), '其他')
+})
 test('subsOf: 有 subs 的父类返回数组、无 subs 返回 null', () => {
   assert.ok(Array.isArray(pure.subsOf('记忆与知识')))
   assert.equal(pure.subsOf('合集与市场'), null)
@@ -263,4 +275,99 @@ test('chipStyle/catChipStyle/tabStyle: 激活态与变体样式', () => {
 test('cliCmdFor: CLI 安装命令拼接', () => {
   assert.equal(pure.cliCmdFor('github:owner/repo'), 'dsh plugin add github:owner/repo')
   assert.equal(pure.cliCmdFor('@scope/pkg'), 'dsh plugin add @scope/pkg')
+})
+
+// ---------- 折叠态选中分类提位（0.9.23，审计批次 C）----------
+test('promoteActiveCat: 折叠态选中分类提位到「全部」后', () => {
+  const chips = [
+    { value: '', display: '全部' },
+    { value: '工具与自动化', count: 5000 },
+    { value: '记忆与知识', count: 800 },
+    { value: '其他', count: 87 },
+  ]
+  // active 为「全部」/ 首个非「全部」chip / 不在列表 → 原数组原序返回（不复制）
+  assert.equal(pure.promoteActiveCat(chips, ''), chips)
+  assert.equal(pure.promoteActiveCat(chips, '工具与自动化'), chips)
+  assert.equal(pure.promoteActiveCat(chips, '不存在'), chips)
+  // 空表 / 单元素不炸
+  assert.deepEqual(pure.promoteActiveCat([], 'x'), [])
+  assert.deepEqual(pure.promoteActiveCat([chips[0]], 'x'), [chips[0]])
+  // active 为末位低频类 → 提到「全部」后，其余保持原相对顺序，且不改输入数组
+  const out = pure.promoteActiveCat(chips, '其他')
+  assert.deepEqual(out.map(c => c.value), ['', '其他', '工具与自动化', '记忆与知识'])
+  assert.deepEqual(chips.map(c => c.value), ['', '工具与自动化', '记忆与知识', '其他'])
+})
+
+// ---------- 网络类预检错误分类（0.9.23，真机取证 2026-10-12）----------
+test('classifyNetError: GitHub 连接探测超时 → github（须先于通用 net 判定）', () => {
+  assert.equal(pure.classifyNetError('dsh: connection to github.com timed out after 5000ms'), 'github')
+  assert.equal(pure.classifyNetError('dsh: connection to gist.github.com timed out after 5000ms'), 'github')
+  assert.equal(pure.classifyNetError('connection to ssh.github.com timed out after 5000ms'), 'github')
+})
+test('classifyNetError: registry 超时 / DNS / 连接重置 → net', () => {
+  assert.equal(pure.classifyNetError('pnpm view timed out after 20000ms'), 'net')
+  assert.equal(pure.classifyNetError("fatal: Could not resolve host: github.com"), 'net')
+  assert.equal(pure.classifyNetError('getaddrinfo ENOTFOUND registry.npmjs.org'), 'net')
+  assert.equal(pure.classifyNetError('request to https://registry.npmjs.org failed: ECONNRESET'), 'net')
+  assert.equal(pure.classifyNetError('Failed to connect to registry'), 'net')
+  assert.equal(pure.classifyNetError('getaddrinfo EAI_AGAIN github.com'), 'net')
+})
+test('classifyNetError: 0.9.24 git CLI 文案（clone 阶段 Recv failure / unable to access）', () => {
+  // 真机原文（2026-10-12 15:10 web profile）：github.com URL → github 键
+  assert.equal(
+    pure.classifyNetError("安装 github:Ebony-Vinyl/dsh-our-free-model 失败: fatal: unable to access 'https://github.com/Ebony-Vinyl/dsh-our-free-model/': Recv failure: Connection was reset"),
+    'github'
+  )
+  // 不带 github.com 的重置文案 → net 键
+  assert.equal(pure.classifyNetError('Recv failure: Connection was reset'), 'net')
+  assert.equal(pure.classifyNetError('connection reset by peer'), 'net')
+  // 防回归：上一版正则漏匹配的三种形态
+  assert.equal(pure.classifyNetError("unable to access 'https://github.com/x/y/': Recv failure"), 'github')
+})
+test('classifyNetError: 非网络类与空值返回空串（不误伤既有文案映射）', () => {
+  assert.equal(pure.classifyNetError('already-installed'), '')
+  assert.equal(pure.classifyNetError('ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION: pkg@1.0.0 was published at 2026-10-12'), '')
+  assert.equal(pure.classifyNetError('stop-profile'), '')
+  assert.equal(pure.classifyNetError(''), '')
+  assert.equal(pure.classifyNetError(undefined), '')
+  assert.equal(pure.classifyNetError(null), '')
+})
+test('npmCandidateFromGithubSpec: github spec → npm 候选（0.9.24）', () => {
+  assert.deepEqual(pure.npmCandidateFromGithubSpec('github:Ebony-Vinyl/dsh-our-free-model'), { owner: 'Ebony-Vinyl', repo: 'dsh-our-free-model', npmName: 'dsh-our-free-model' })
+  assert.deepEqual(pure.npmCandidateFromGithubSpec('github:owner/dsh-x.git'), { owner: 'owner', repo: 'dsh-x', npmName: 'dsh-x' })
+  // 非 github: 形态一律 null（npm 包名 / 完整 URL / 空值不产候选）
+  assert.equal(pure.npmCandidateFromGithubSpec('dsh-plugin-cards'), null)
+  assert.equal(pure.npmCandidateFromGithubSpec('https://github.com/x/y'), null)
+  assert.equal(pure.npmCandidateFromGithubSpec('github:no-slash'), null)
+  assert.equal(pure.npmCandidateFromGithubSpec(''), null)
+  assert.equal(pure.npmCandidateFromGithubSpec(undefined), null)
+})
+test('verifyNpmCandidate: 同名校验 + repository 字段防投毒（0.9.24）', () => {
+  // name 不一致 → 拒绝
+  assert.equal(pure.verifyNpmCandidate({ name: 'other' }, 'o', 'dsh-x'), '')
+  assert.equal(pure.verifyNpmCandidate(null, 'o', 'dsh-x'), '')
+  // 无 repository 字段 → 仅同名弱信号（放行，dsh 插件惯例包名=仓库名）
+  assert.equal(pure.verifyNpmCandidate({ name: 'dsh-x' }, 'o', 'dsh-x'), 'name-only')
+  // repository 一致（对象/字符串两种形态，大小写不敏感）→ verified
+  assert.equal(pure.verifyNpmCandidate({ name: 'dsh-x', repository: { url: 'git+https://github.com/O/dsh-X.git' } }, 'o', 'dsh-x'), 'verified')
+  assert.equal(pure.verifyNpmCandidate({ name: 'dsh-x', repository: 'https://github.com/o/dsh-x' }, 'o', 'dsh-x'), 'verified')
+  // repository 指向别的仓库 → 拒绝（防同名抢注包）
+  assert.equal(pure.verifyNpmCandidate({ name: 'dsh-x', repository: { url: 'https://github.com/attacker/other' } }, 'o', 'dsh-x'), '')
+})
+test('fbPlanFor: github spec → 降级梯计划（tgz 镜像 + codeload 端点，0.9.24）', () => {
+  var p1 = pure.fbPlanFor({ full_name: 'Ebony-Vinyl/dsh-our-free-model', tgz: 'Ebony-Vinyl__dsh-our-free-model.tgz' }, 'github:Ebony-Vinyl/dsh-our-free-model')
+  assert.equal(p1.ghSpec, 'github:Ebony-Vinyl/dsh-our-free-model')
+  assert.equal(p1.npmName, 'dsh-our-free-model')
+  assert.equal(p1.tgzUrl, pure.TGZ_BASE + 'Ebony-Vinyl__dsh-our-free-model.tgz')
+  assert.equal(p1.cdlUrl, 'https://codeload.github.com/Ebony-Vinyl/dsh-our-free-model/tar.gz/HEAD')
+  // 快照无 tgz 字段 → tgzUrl 空（梯子自动跳级）
+  var p2 = pure.fbPlanFor({ full_name: 'o/r' }, 'github:o/r')
+  assert.equal(p2.tgzUrl, '')
+  assert.equal(p2.cdlUrl, 'https://codeload.github.com/o/r/tar.gz/HEAD')
+  // item 缺失（自定义安装/队列）→ full_name 回退 spec 推导
+  var p3 = pure.fbPlanFor(null, 'github:o/r.git')
+  assert.equal(p3.cdlUrl, 'https://codeload.github.com/o/r/tar.gz/HEAD')
+  // 非 github: spec → null（退化为原通道重试）
+  assert.equal(pure.fbPlanFor({ tgz: 'x' }, 'dsh-plugin-cards'), null)
+  assert.equal(pure.fbPlanFor({}, 'https://github.com/o/r'), null)
 })
