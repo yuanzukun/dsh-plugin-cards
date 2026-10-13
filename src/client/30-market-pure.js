@@ -799,6 +799,7 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     matchCat: matchCat, chipStyle: chipStyle, catChipStyle: catChipStyle, cliCmdFor: cliCmdFor, tabStyle: tabStyle,
     promoteActiveCat: promoteActiveCat, // 0.9.23：折叠态选中分类提位（40 块，声明提升可见）
     classifyNetError: classifyNetError, // 0.9.23：网络类预检错误分类（40 块，声明提升可见）
+    classifyEnableFailure: classifyEnableFailure, // 0.9.29：启用失败分类（40 块）
     netKeyFromChange: netKeyFromChange, // 0.9.24b：ChangeResult 失败 → 网络分类（40 块）
     fbPlanFor: fbPlanFor, TGZ_BASE: TGZ_BASE, // 0.9.24：网络失败降级梯计划（tgz 镜像 + codeload 端点）
     ladderNext: ladderNext, // 0.9.27：降级梯执行层决策（40 块，声明提升可见；走位矩阵见函数头注释）

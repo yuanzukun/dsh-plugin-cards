@@ -85,6 +85,23 @@ function netKeyFromChange(res) {
   return classifyNetError(diag.replace(/\x1B\[[0-9;]*[A-Za-z]/g, ''))
 }
 
+/** ---- 0.9.29：宿主启用失败分类（纯函数，供 enableNewBundles / friendlyManageError 共用）----
+ * 2026-10-13 真机取证（FSMargoo/dsh-at-file）：插件把宿主包声明为 peerDependencies "*"，
+ * profile 环境未开 auto-install-peers → 宿主 import 插件入口时 ERR_MODULE_NOT_FOUND，
+ * 管理接口只回固定文案「<name> (<name>): failed to import」，不含底层缺包细节。
+ * 命中 → 调用方换成人话（插件本体已装好，作者打包问题或与宿主版本不兼容，反馈作者）。
+ * 与 classifyNetError 同构：返回键（''=未命中），文案由调用方 T() 映射。 */
+var ENABLE_FAIL_PATTERNS = [
+  { key: 'import', re: /failed to import/i },
+]
+function classifyEnableFailure(m) {
+  var s = String(m == null ? '' : m)
+  for (var i = 0; i < ENABLE_FAIL_PATTERNS.length; i++) {
+    if (ENABLE_FAIL_PATTERNS[i].re.test(s)) return ENABLE_FAIL_PATTERNS[i].key
+  }
+  return ''
+}
+
 /** ---- 0.9.24：github spec → npm 降级候选（纯函数，配合 install 网络失败自动降级）----
  * 'github:owner/repo' → { owner, repo, npmName }；非 github: 形态返回 null。
  * npmName 取仓库名——dsh 插件惯例 npm 包名与仓库名一致（hub 快照 2846/13748 已挂 npm 链，

@@ -811,7 +811,11 @@ function createCommunitySection(ctx, form) {
               seq = seq.then(function () {
                 return pm.setBundleEnabled(b.name, true).then(unwrapRpc).then(function (res) {
                   checkChange(res, T('mk.opEnable', { name: b.name }))
-                }).catch(function (e) { failed.push(T('mk.enableFailedItem', { name: b.name, msg: String((e && e.message) || e) })) })
+                }).catch(function (e) {
+                  var em = String((e && e.message) || e)
+                  // 0.9.29：启用失败分类人话化——import 失败（作者打包/宿主兼容性）换自助指引，其余原文
+                  failed.push(T('mk.enableFailedItem', { name: b.name, msg: classifyEnableFailure(em) === 'import' ? T('mk.errImportFail') : em }))
+                })
               })
             }
           })(arr[i])
@@ -972,6 +976,8 @@ function createCommunitySection(ctx, form) {
       }
       // 0.9.28：宿主 stale-approval——授权键与本次尝试的待构建清单不匹配（每次安装尝试独立记录）
       if (m.indexOf('stale-approval') !== -1) return T('mk.errStaleApproval')
+      // 0.9.29：宿主 import 失败（插件本体已装好，作者打包/宿主兼容性问题）→ 人话 + 反馈指引
+      if (classifyEnableFailure(m) === 'import') return T('mk.errImportFail')
       if (m.indexOf('stop-profile') !== -1) return T('mk.errStopProfile')
       if (m.indexOf('bundle-in-use') !== -1) return T('mk.errInUse')
       if (m.indexOf('not-removable') !== -1) return T('mk.errNotRemovable')

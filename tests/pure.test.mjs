@@ -607,3 +607,16 @@ test('chipStyle/catChipStyle: 26px 基准统一（border-box 定高）', () => {
   // active 态不改变高度语义
   assert.equal(pure.chipStyle(true).height, '26px')
 })
+
+// ---------- 0.9.29：宿主启用失败分类（import 失败人话化前置） ----------
+test('classifyEnableFailure: failed to import 命中（大小写不敏感）', () => {
+  assert.equal(pure.classifyEnableFailure('dsh-at-file (dsh-at-file): failed to import'), 'import')
+  assert.equal(pure.classifyEnableFailure('dsh-foo: Failed to Import'), 'import')
+})
+test('classifyEnableFailure: 其他启用失败不误报', () => {
+  assert.equal(pure.classifyEnableFailure('stop-profile'), '')
+  assert.equal(pure.classifyEnableFailure('bundle-in-use'), '')
+  assert.equal(pure.classifyEnableFailure(''), '')
+  assert.equal(pure.classifyEnableFailure(null), '')
+  assert.equal(pure.classifyEnableFailure(undefined), '')
+})

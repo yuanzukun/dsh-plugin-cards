@@ -277,6 +277,8 @@ var ZH = {
   'mk.updatedOkRestart': '⬆️ 已更新到最新：{name}（将在下次启动 DeepSeek Harness 后加载新版界面）',
   'mk.updateFailed': '❌ 更新失败：',
   'mk.enableFailedItem': '{name}（{msg}）',
+  // 0.9.29：宿主 import 失败人话化（真机取证 FSMargoo/dsh-at-file：peer 依赖宿主包未随装 → failed to import 天书）
+  'mk.errImportFail': '插件代码加载失败（宿主无法 import 插件入口）：插件文件已装好，但作者打包可能把宿主内置包声明为未随装的 peer 依赖，或与当前宿主版本不兼容——建议向插件作者反馈，或在「已安装」区卸载止损',
   'mk.opFailLabel': '{label}失败：',
   'mk.opCancelled': '{label}已取消（宿主已回滚变更）',
   'mk.rpcFailed': 'RPC 调用失败',
