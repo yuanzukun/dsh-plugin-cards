@@ -56,19 +56,28 @@ const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8'))
 if (!Array.isArray(snap.items) || snap.items.length < 1000) throw new Error('快照不合法：items < 1000')
 if (typeof snap.builtAt !== 'number') throw new Error('快照不合法：builtAt 非数字')
 
-// ---- 4. 裁剪（M1）：只影响内联产物，assets 原料保持全量 ----
-const rawTotal = snap.items.length
-const ghBoth = snap.items.filter((i) => i && i.source !== 'npm')
-const npmOnly = snap.items.filter((i) => i && i.source === 'npm' && i.installable === true)
-const keptGh = ghBoth.slice().sort(byStars).slice(0, KEEP_GH)
-const keptNpm = npmOnly.slice().sort(byUpdated).slice(0, KEEP_NPM)
-if (keptGh.length < GH_MARGIN) throw new Error('github/both 保留 ' + keptGh.length + ' < ' + GH_MARGIN + '（消费端过滤后须保持 ≥' + CONSUMER_FLOOR + '），拒绝组装')
-const kept = keptGh.concat(keptNpm).sort(byStars)
+// ---- 4. 裁剪（M1）：先按仓库身份去重再裁剪（0.9.30 修复重复行挤占槽位）----
+// 纯函数工厂裁剪位于 src/client/30-market-pure.js（factoryTrim），与运行时目录共用 dedupItems 口径；
+// 此前直接对原始行按星取 Top1500，hub 快照 13.76% 重复行导致唯一仓库只剩 1080（28% 槽位浪费）。
+// 仅影响内联产物，assets 原料保持全量。
+const { loadPure } = require('./load-client-pure.cjs')
+const pure = loadPure()
+let trim
+try {
+  trim = pure.factoryTrim(snap.items, KEEP_GH, KEEP_NPM, GH_MARGIN)
+} catch (e) {
+  throw new Error(e.message + '（消费端过滤后须保持 ≥' + CONSUMER_FLOOR + '），拒绝组装')
+}
+const kept = trim.items
+const keptGh = trim.keptGh
+const keptNpm = trim.keptNpm
+const rawTotal = trim.rawTotal
+const uniqueTotal = trim.uniqueTotal
 
 const out = Object.assign({}, snap, {
   items: kept,
   factoryTrimmed: true,
-  factoryKeep: { githubBoth: keptGh.length, npmOnly: keptNpm.length, rawTotal: rawTotal },
+  factoryKeep: { githubBoth: keptGh.length, npmOnly: keptNpm.length, rawTotal: rawTotal, uniqueTotal: uniqueTotal },
 })
 
 // ---- 5. 组装 + 校验 ----
@@ -80,15 +89,7 @@ execFileSync(process.execPath, ['--check', OUT_PATH], { stdio: 'inherit' })
 const mb = (n) => (n / 1048576).toFixed(2) + 'MB'
 console.log(
   '✅ lib/client.js 组装完成（' + CHUNKS.length + ' 块拼接 + 出厂快照 M1 裁剪）：',
-  kept.length, '条（github/both', keptGh.length, '+ npm-only', keptNpm.length, '；原料', rawTotal, '条），',
+  kept.length, '条（github/both', keptGh.length, '+ npm-only', keptNpm.length, '；原料', rawTotal, '条 / 去重', uniqueTotal, '唯一），',
   '内联体积', mb(JSON.stringify(out).length), '（原全量', mb(JSON.stringify(snap).length), '），',
   'builtAt', new Date(snap.builtAt).toISOString(), '，产物', mb(next.length), '，node --check 通过',
 )
-
-function byStars(a, b) {
-  return (b.stargazers_count || 0) - (a.stargazers_count || 0) ||
-    String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
-}
-function byUpdated(a, b) {
-  return String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
-}

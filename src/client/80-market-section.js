@@ -55,10 +55,16 @@ function createCommunitySection(ctx, form) {
     // 不符合「目录条目须来自官方社区仓库」的口径，默认隐藏；打开后在快照索引构建时纳入（缓存键含此开关）。
     var npmChanState = useState(true) // 0.9.5：默认开（用户决策变更，原 1.1.0 默认关=只看官方 topic 口径）
     var npmChan = npmChanState[0], setNpmChan = npmChanState[1]
-    // 1.2.0：引擎兼容开关（默认开）。engineCompat===0（dsh.engine 与桌面端运行时不兼容）条目
+    // 1.2.0：引擎兼容开关（默认开）。engineCompat===0（官方 engines.dsh 与桌面端运行时不兼容）条目
     // 装上即坏，与「不可安装」同级默认隐藏；null（未声明/未校验）保留，宿主安装时终审。
     var engineState = useState(true)
     var engineOn = engineState[0], setEngineOn = engineState[1]
+    // 1.4.0 P0-1：平台兼容开关（默认开）。声明了 dsh.bundle.platforms 且不含当前宿主的组合包，
+    // 官方 bundle-platform.ts 抛错跳过（装上即被跳过）；platforms 省略（null）或平台无法判定时保留。
+    var platformState = useState(true)
+    var platformOn = platformState[0], setPlatformOn = platformState[1]
+    // 1.4.0 P0-1：本机平台（navigator.platform / process.platform → 官方 Node 平台名）
+    var hostPlatform = detectPlatform()
     // 0.9.12 P2：目录视图模式（grid|list），记忆于 localStorage
     var VIEW_KEY = 'dcards.viewMode'
     var viewModeState = useState((function () { try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid' } catch (eVm) { return 'grid' } })())
@@ -114,7 +120,7 @@ function createCommunitySection(ctx, form) {
           var list = Array.isArray(data) ? data : (data && Array.isArray(data.items) ? data.items : [])
           if (!list.length && data && data.message) throw new Error(T('mk.errSource') + data.message)
           list = list.filter(function (it) { return it && !it.fork && !it.archived })
-          list.sort(rankSort)
+          list.sort((a, b) => rankSort(a, b, hostPlatform)) // 1.4.0：平台沉底口径与快照路径一致（官方源条目无 platforms 字段 → 不过滤）
           setItems(list)
           setTotalCount(ghSearch && data && typeof data.total_count === 'number' ? data.total_count : null)
           setPage(reqPage)
@@ -189,7 +195,7 @@ function createCommunitySection(ctx, form) {
     useEffectFn(function () {
       if (!ghSearch || totalCount === null || totalCount <= 0) return
       var cancelled = false
-      var cached = catIdxCacheLoad((qualityOn ? 1 : 0) + (npmChan ? 2 : 0) + (engineOn ? 4 : 0), totalCount)
+      var cached = catIdxCacheLoad((qualityOn ? 1 : 0) + (npmChan ? 2 : 0) + (engineOn ? 4 : 0) + (platformOn ? 8 : 0), totalCount)
       // 0.8.20：面板常驻自动刷新 —— 每 30min 检查一次，1h 节流闸门限频（实际拉取 ≥1h 一次）；
       // builtAt 更新才无缝替换，无更新零渲染零流量；组件卸载（关面板/切 Tab）随 cleanup 清除。
       // 局限：面板完全关闭时组件未挂载，无法后台运行（宿主无插件后台钩子）——「开着面板」即全自动。
@@ -242,7 +248,7 @@ function createCommunitySection(ctx, form) {
           if (zm0 && typeof zm0 === 'object') for (var zk in zm0) { if (zm0[zk]) zhMap[zk] = zm0[zk] }
         } catch (eZm0) { /* 无持久化映射，退化用 catidx */ }
         try {
-          var prevCat = catIdxCacheLoad((qualityOn ? 1 : 0) + (npmChan ? 2 : 0) + (engineOn ? 4 : 0), totalCount)
+          var prevCat = catIdxCacheLoad((qualityOn ? 1 : 0) + (npmChan ? 2 : 0) + (engineOn ? 4 : 0) + (platformOn ? 8 : 0), totalCount)
           if (prevCat && Array.isArray(prevCat.items)) {
             for (var zi = 0; zi < prevCat.items.length; zi++) {
               var zIt = prevCat.items[zi]
@@ -397,14 +403,14 @@ function createCommunitySection(ctx, form) {
           if (cIt && !cIt.descZh && zhMap[cIt.full_name]) cIt.descZh = zhMap[cIt.full_name]
         }
         // 排序（★ 降序）+ 逐条分类计数
-        collected.sort(rankSort)
+        collected.sort((a, b) => rankSort(a, b, hostPlatform)) // 1.4.0：同上，harvest 条目无 platforms 字段时不过滤
         var counts = {}
         for (var m = 0; m < collected.length; m++) {
           var lab = classifyItem(collected[m])
           counts[lab] = (counts[lab] || 0) + 1
         }
         var builtAt = Date.now()
-        catIdxCacheSave({ v: CATIDX_RULES_VER, q: (qualityOn ? 1 : 0) + (npmChan ? 2 : 0) + (engineOn ? 4 : 0), total: totalCount, builtAt: builtAt, counts: counts, items: collected })
+        catIdxCacheSave({ v: CATIDX_RULES_VER, q: (qualityOn ? 1 : 0) + (npmChan ? 2 : 0) + (engineOn ? 4 : 0) + (platformOn ? 8 : 0), total: totalCount, builtAt: builtAt, counts: counts, items: collected })
         try { localStorage.setItem(OFFICIAL_SYNC_AT_KEY, String(builtAt)) } catch (eS) { /* 隐私模式静默 */ }
         setCatIdx({ status: 'ready', done: collected.length, total: totalCount, items: collected, counts: counts, builtAt: builtAt })
       }).catch(function (e) {
@@ -439,7 +445,7 @@ function createCommunitySection(ctx, form) {
       function trySnap(urls, minBuiltAt, bestStale) {
         if (cancelled || !urls || !urls.length) {
           if (minBuiltAt == null && bestStale && bestStale.data) {
-            var stS = catIdxFromSnapshot(bestStale.data, qualityOn, totalCount, CATIDX_SNAPSHOT_TTL_MS, npmChan, engineOn)
+            var stS = catIdxFromSnapshot(bestStale.data, qualityOn, totalCount, CATIDX_SNAPSHOT_TTL_MS, npmChan, engineOn, hostPlatform, platformOn)
             if (stS) { setCatIdx(stS); return Promise.resolve(true) }
           }
           return Promise.resolve(false)
@@ -460,7 +466,7 @@ function createCommunitySection(ctx, form) {
               if (!bestStale || data.builtAt > (bestStale.builtAt || 0)) bestStale = { data: data, builtAt: data.builtAt }
               return false
             }
-            var st = catIdxFromSnapshot(data, qualityOn, totalCount, minBuiltAt != null ? null : CATIDX_SNAPSHOT_TTL_MS, npmChan, engineOn)
+            var st = catIdxFromSnapshot(data, qualityOn, totalCount, minBuiltAt != null ? null : CATIDX_SNAPSHOT_TTL_MS, npmChan, engineOn, hostPlatform, platformOn)
             if (!st) return false
             setCatIdx(st)
             return true
@@ -476,12 +482,12 @@ function createCommunitySection(ctx, form) {
       trySnap(snapshotUrlCandidates()).then(function (ok) {
         if (cancelled) return
         if (ok) { maybeOfficialSync(); return } // 0.8.11：快照就绪 ≠ 官方源新鲜，仍按 24h 节流直采官方 topic
-        var st = catIdxFromSnapshot(FACTORY_SNAPSHOT, qualityOn, totalCount, null, npmChan, engineOn)
+        var st = catIdxFromSnapshot(FACTORY_SNAPSHOT, qualityOn, totalCount, null, npmChan, engineOn, hostPlatform, platformOn)
         if (st) { setCatIdx(st); startHarvest(true); return }
         startHarvest(false)
       })
       return function () { cancelled = true; clearInterval(snapTimer); harvestKickRef.current = null; snapKickRef.current = null }
-    }, [catalogUrl, qualityOn, npmChan, engineOn, ghSearch, totalCount])
+    }, [catalogUrl, qualityOn, npmChan, engineOn, platformOn, ghSearch, totalCount])
 
     // ---- 0.5.4 数据源与过滤（置于翻译 effect 之前，供其作用于当前渲染条目） ----
     // 索引就绪 → 全部视图与分类视图都走全量索引（客户端分页/跨页过滤/全局搜索）；
@@ -1610,6 +1616,11 @@ function createCommunitySection(ctx, form) {
         var engBadge = item.ec === 0 ? jsx('span', { key: 'engbad', className: 'dcards-badge',
           style: { background: 'var(--dsw-alias-state-error-tertiary)', color: 'var(--dsw-alias-state-error-primary)' },
           title: T('mk.engineBadTip'), children: '⚠ ' + T('mk.engineBad') }) : null
+        var platBadge = !platformOk(item, hostPlatform) ? jsx('span', { key: 'platbad', className: 'dcards-badge',
+          style: { background: 'var(--dsw-alias-state-warn-tertiary)', color: 'var(--dsw-alias-state-warn-label)' },
+          title: T((item.pfm === true || item.platformMalformed === true) ? 'mk.platformMalformedTip' : 'mk.platformBadTip',
+            { platforms: (item.platforms && item.platforms.join(', ')) || '' }),
+          children: '⚠ ' + T('mk.platformBad') }) : null
         var verEl = ver ? jsx('span', { key: 'ver', style: META_STYLE,
           title: rtRec && rtRec.v ? T('mk.verTipRt') : T('mk.verTipPkg'), children: ver }) : null // 0.9.13：修复 vv 双前缀（ver 已含 v）
         // 2026-10-11 UI 审计③：排队中按钮 disabled 但仍实底亮色——补弱化视觉（opacity .5 + not-allowed）
@@ -1661,7 +1672,7 @@ function createCommunitySection(ctx, form) {
           jsx('div', { key: 'actions', className: 'dcards-actions', children: [
             jsx('span', { key: 'cat', className: 'dcards-catdot', style: { color: catColor, marginRight: 'auto' },
               title: catLabel(cat), children: catDotInner }),
-            offBadge, engBadge, verEl, btnEl,
+            offBadge, engBadge, platBadge, verEl, btnEl,
           ] }),
         ] : [
           // 0.9.16 方案 A（参考 VS Code 扩展视图 / Obsidian 社区插件范式）：窄容器纵向堆叠，名称不再与描述横向竞争
@@ -1675,7 +1686,7 @@ function createCommunitySection(ctx, form) {
             descEl,
             jsx('div', { key: 'l3', className: 'dcards-l3', children: [
               jsx('span', { key: 'cat', className: 'dcards-catdot', style: { color: catColor }, title: catLabel(cat), children: catDotInner }),
-              offBadge, engBadge, verEl,
+              offBadge, engBadge, platBadge, verEl,
               updated ? jsx('span', { key: 'upd', style: META_STYLE, title: updated, children: T('mk.updatedRel', { rel: updatedRel }) }) : null,
             ] }),
           ] }),
@@ -1770,11 +1781,17 @@ function createCommunitySection(ctx, form) {
             onClick: function () { setNpmChan(!npmChan) },
             children: T('mk.npmChan', { v: npmChan ? T('mk.on') : T('mk.off') }),
           }),
-          // 1.2.0：引擎兼容开关——dsh.engine 与桌面端运行时不兼容的条目默认隐藏（L2 硬门禁）
+          // 1.2.0：引擎兼容开关——engines.dsh 与桌面端运行时不兼容的条目默认隐藏（L2 硬门禁）
           jsx('button', {
             key: 'engineok', style: chipStyle(engineOn), title: T('mk.engineTip'),
             onClick: function () { setEngineOn(!engineOn) },
             children: T('mk.engine', { v: engineOn ? T('mk.on') : T('mk.off') }),
+          }),
+          // 1.4.0 P0-1：平台开关——声明 dsh.bundle.platforms 且不含当前宿主的组合包被官方跳过，默认隐藏
+          jsx('button', {
+            key: 'platformok', style: chipStyle(platformOn), title: T('mk.platformTip'),
+            onClick: function () { setPlatformOn(!platformOn) },
+            children: T('mk.platform', { v: platformOn ? T('mk.on') : T('mk.off') }),
           }),
           // 0.8.1：排序 chip 移回插件市场工具行（设置页只留目录口径开关）
         ] }),

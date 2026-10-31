@@ -281,7 +281,7 @@ function classifySub(item, parentLabel) {
 
 /** ---- 0.5.4 全量精确统计：分桶抓全部仓库 + localStorage 缓存（24h TTL） ---- */
 var CATIDX_CACHE_KEY = 'dsh-plugin-cards.catidx.v1'
-var CATIDX_RULES_VER = 8 // 分类规则/数据口径调整时 +1，使旧缓存整体失效（v8：界面与桌面顶级 kw 补便签/小游戏/五子棋/批注/消息编辑，v7：二级分类 + 准确率调优 + dsh- 前缀漏斗修补）
+var CATIDX_RULES_VER = 9 // 分类规则/数据口径调整时 +1，使旧缓存整体失效（v9：P0-1 平台过滤；v8：界面与桌面顶级 kw 补便签/小游戏/五子棋/批注/消息编辑，v7：二级分类 + 准确率调优 + dsh- 前缀漏斗修补）
 // 0.8.9：卸载后整页刷新定时器 —— 必须挂模块作用域：卸载成功后宿主刷新会让面板组件卸载重挂，
 // 组件作用域的 timer 会被 effect cleanup 清掉，导致刷新永远不触发（真机实测踩坑）
 var pageReloadTimer = null
@@ -301,6 +301,8 @@ function compactItem(it) {
     installable: typeof it.installable === 'boolean' ? it.installable : null,
     ec: typeof it.engineCompat === 'number' ? it.engineCompat : null, // 1.2.0 L2 引擎兼容：1/0/null（旧快照无此字段→null 不过滤）
     ms: typeof it.metaScore === 'number' ? it.metaScore : 0, // 1.2.0 L3 展示合规 0-3（icon/locale/package.json export）
+    ...(it.platformMalformed === true ? { pfm: true } : {}), // 1.4.0 P0-1：仅非法时下发（省体积；platformOk 对缺省视为未声明）
+    ...(Array.isArray(it.platforms) ? { platforms: it.platforms.slice(0, 12) } : {}), // 1.4.0 P0-1：仅声明时下发（省体积；platformOk 对缺省视为全平台）
     source: typeof it.source === 'string' ? it.source : '',
     stargazers_count: it.stargazers_count || 0,
     updated_at: typeof it.updated_at === 'string' ? it.updated_at : '',
@@ -310,18 +312,58 @@ function compactItem(it) {
   }
 }
 
-/** 排序：可装优先（installable false 沉底），引擎不兼容（ec===0，1.2.0 L2）同级再沉底；
- *  同级按 stars，再按展示合规分（ms，0.2.0 规范三件套）——合规示范排前 */
-function rankSort(a, b) {
-  var ra = (a && a.installable === false ? 1 : 0) + (a && a.ec === 0 ? 1 : 0)
-  var rb = (b && b.installable === false ? 1 : 0) + (b && b.ec === 0 ? 1 : 0)
+/** 排序：可装优先（installable false 沉底），引擎不兼容（ec===0，1.2.0 L2）与平台不支持
+ *  （platformOk===false，1.4.0 P0-1）同级再沉底；同级按 stars，再按展示合规分（ms，0.2.0 规范三件套）——合规示范排前。
+ *  hostPlatform 传 '' 表示无法判定（不参与沉底，仅过滤层负责）。 */
+function rankSort(a, b, hostPlatform) {
+  var ra = (a && a.installable === false ? 1 : 0) + (a && a.ec === 0 ? 1 : 0) + (a && platformOk(a, hostPlatform) === false ? 1 : 0)
+  var rb = (b && b.installable === false ? 1 : 0) + (b && b.ec === 0 ? 1 : 0) + (b && platformOk(b, hostPlatform) === false ? 1 : 0)
   return ra - rb || (b.stargazers_count || 0) - (a.stargazers_count || 0) || ((b.ms || 0) - (a.ms || 0))
 }
 
-/** ---- 0.9.10 目录去重（M2）：hub 快照里同一 GitHub 仓库可能被多个 npm 包名回挂（镜像/抢注包），
- *  实测 dsh-market/dsh-market 同名 4 条（npm: '' / dshmarket / @chatcode/cco-market / dsh-market-plus），
- *  spec 互不相同按 spec 查不出 → 按 GitHub 仓库身份（full_name）去重；npm-only 条目按 npm 包名（注册表唯一，天然不重）。
- *  保留优先级：可安装 > npm 名与仓库名一致 > 展示合规分 > 星数 > 来源 both>github>npm（均为确定性字段，结果稳定） ---- */
+/** 1.4.0 P0-1：平台合规判定（官方 app-boot bundle-platform.ts 同源口径）。
+ *  pfm=true / platformMalformed=true（dsh.bundle.platforms 格式非法，官方 assertBundlePlatform 抛错跳过该组合包）→ 恒不可装；
+ *  platforms 省略（null）→ 全平台（true）；否则要求 platforms 含 hostPlatform。
+ *  hostPlatform 传 ''（无法判定，如旧快照/navigator 不可用）→ true，交过滤层不误伤。
+ *  ⚠️ 同时认 pfm（compactItem 压缩字段）与 platformMalformed（快照原始字段）——过滤层用原始条目，渲染层用压缩条目。 */
+function platformOk(item, hostPlatform) {
+  if (!item || item.pfm === true || item.platformMalformed === true) return false
+  var pl = Array.isArray(item.platforms) ? item.platforms : null
+  if (!pl || !pl.length) return true
+  return !hostPlatform || pl.indexOf(hostPlatform) !== -1
+}
+
+/** 1.4.0 P0-1：navigator.platform / process.platform → 官方 Node 平台名（bundle-platform.ts NODE_PLATFORMS 同源）。
+ *  navigator.platform 值：Win32 / MacIntel / Linux x86_64 / Android … */
+function normalizePlatform(p) {
+  var s = String(p || '').toLowerCase()
+  if (!s) return ''
+  if (s.indexOf('win') === 0) return 'win32'
+  if (s.indexOf('mac') === 0 || s.indexOf('iphone') === 0 || s.indexOf('ipad') === 0) return 'darwin'
+  if (s.indexOf('linux') === 0 || s.indexOf('cros') === 0 || s.indexOf('android') === 0) return 'linux'
+  if (s.indexOf('freebsd') === 0) return 'freebsd'
+  if (s.indexOf('openbsd') === 0) return 'openbsd'
+  if (s.indexOf('netbsd') === 0) return 'netbsd'
+  if (s.indexOf('sunos') === 0 || s.indexOf('solaris') === 0) return 'sunos'
+  if (s.indexOf('aix') === 0) return 'aix'
+  return s
+}
+
+/** 1.4.0 P0-1：探测本机平台（优先 navigator.platform，回退 process.platform）。不可用返回 ''。 */
+function detectPlatform() {
+  try {
+    if (typeof navigator !== 'undefined' && navigator && navigator.platform) return normalizePlatform(navigator.platform)
+  } catch (e) { /* navigator 不可用 */ }
+  try { if (typeof process !== 'undefined' && process && process.platform) return normalizePlatform(process.platform) } catch (e) { /* process 不可用 */ }
+  return ''
+}
+
+/** ---- 去重双口径（0.9.31 拆分）----
+ *  dedupPickScore / dedupBetter：同一身份内择优（可安装 > npm 名与仓库名一致 > 展示合规分 > 星数 > 来源 both>github>npm，均为确定性字段，结果稳定）。
+ *  dedupItems（市场视图）：npm 卡身份 = npm 包名（monorepo 多包各占一卡，与 hub dedupAfterProbe 对齐）；
+ *    gh 裸卡身份 = full_name，且仓库存在可装 npm 卡时丢弃（覆盖 dsh.bundle 只在 git HEAD、尚未发布 npm 的仓库）。
+ *  dedupByRepo（出厂裁剪）：按 full_name 收敛为每仓库一条（npm-only 按包名）——离线 Top1500 是仓库级精选，
+ *    镜像/抢注包挤占槽位会丢唯一仓库（0.9.30 修复点），故裁剪前必须先收敛。 */
 function dedupPickScore(it) {
   var inst = it && it.installable === true ? 0 : (it && it.installable == null ? 1 : 2)
   var fn = String((it && it.full_name) || '')
@@ -337,11 +379,36 @@ function dedupBetter(a, b) { // a 是否优于 b（逐维比较，全等视为�
 }
 function dedupItems(items) {
   var keys = [], map = {}, loose = [] // loose：既无 full_name 又无 npm 的无身份条目（正常不存在，防御保留）
+  var repoHasInstallableNpm = {}
   for (var i = 0; i < items.length; i++) {
     var it = items[i]
-    var fn = String((it && it.full_name) || '')
-    var npm = String((it && it.npm) || '')
-    var key = fn ? 'gh:' + fn.toLowerCase() : (npm ? 'npm:' + npm.toLowerCase() : '')
+    if (!it) continue
+    var fn = String(it.full_name || '').toLowerCase()
+    var npm = String(it.npm || '').toLowerCase()
+    if (npm && it.installable === true && fn) repoHasInstallableNpm[fn] = true
+    var key = npm ? 'npm:' + npm : (fn ? 'gh:' + fn : '')
+    if (!key) { loose.push(it); continue }
+    if (!(key in map)) { map[key] = it; keys.push(key) }
+    else if (dedupBetter(it, map[key])) map[key] = it
+  }
+  var out = []
+  for (var k = 0; k < keys.length; k++) {
+    var keep = map[keys[k]]
+    // gh 裸卡（npm=''）且仓库已有可装 npm 卡 → 丢弃；npm 卡各保留（monorepo 多包=独立可装单元）
+    if (!keep.npm && keep.full_name && repoHasInstallableNpm[String(keep.full_name).toLowerCase()]) continue
+    out.push(keep)
+  }
+  for (var l = 0; l < loose.length; l++) out.push(loose[l])
+  return out
+}
+function dedupByRepo(items) {
+  var keys = [], map = {}, loose = [] // loose：既无 full_name 又无 npm 的无身份条目（正常不存在，防御保留）
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i]
+    if (!it) continue
+    var fn = String(it.full_name || '').toLowerCase()
+    var npm = String(it.npm || '').toLowerCase()
+    var key = fn ? 'gh:' + fn : (npm ? 'npm:' + npm : '')
     if (!key) { loose.push(it); continue }
     if (!(key in map)) { map[key] = it; keys.push(key) }
     else if (dedupBetter(it, map[key])) map[key] = it
@@ -350,6 +417,38 @@ function dedupItems(items) {
   for (var k = 0; k < keys.length; k++) out.push(map[keys[k]])
   for (var l = 0; l < loose.length; l++) out.push(loose[l])
   return out
+}
+
+/** ---- 出厂快照 M1 裁剪（0.9.30：去重前置；0.9.31：仓库级收敛口径） ----
+ *  背景：hub 快照同一 GitHub 仓库可被多个 npm 镜像/抢注包回挂（2026-10-30 批次实测
+ *  22274 raw → 19208 unique，13.76% 重复行）。旧实现直接对原始行按星降序取 Top1500，
+ *  重复行挤占槽位 → 唯一仓库只剩 1080（28% 槽位浪费，离线首屏白丢 420 个插件）。
+ *  修复：裁剪前先 dedupByRepo 收敛为每仓库一条（npm-only 按包名）再按星降序取 Top1500。
+ *  ⚠️ 离线裁剪用仓库级口径（dedupByRepo），与在线市场视图（dedupItems，monorepo 多包各占一卡）区分：
+ *  离线 Top1500 是「仓库级精选」，保留 monorepo 全部包会挤占唯一仓库槽位。
+ *  纯函数：Node 单测可覆盖（tests/pure.test.mjs）。 */
+function factoryTrim(items, keepGh, keepNpm, ghMargin) {
+  var rawTotal = items.length
+  var dedup = dedupByRepo(items)
+  var ghBoth = [], npmOnly = []
+  for (var i = 0; i < dedup.length; i++) {
+    var it = dedup[i]
+    if (!it) continue
+    if (it.source === 'npm') { if (it.installable === true) npmOnly.push(it) }
+    else ghBoth.push(it)
+  }
+  var keptGh = ghBoth.slice().sort(byStarsTrim).slice(0, keepGh)
+  var keptNpm = npmOnly.slice().sort(byUpdatedTrim).slice(0, keepNpm)
+  if (keptGh.length < ghMargin) throw new Error('github/both 保留 ' + keptGh.length + ' < ' + ghMargin)
+  var kept = keptGh.concat(keptNpm).sort(byStarsTrim)
+  return { items: kept, keptGh: keptGh, keptNpm: keptNpm, rawTotal: rawTotal, uniqueTotal: dedup.length }
+}
+function byStarsTrim(a, b) {
+  return (b.stargazers_count || 0) - (a.stargazers_count || 0) ||
+    String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
+}
+function byUpdatedTrim(a, b) {
+  return String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
 }
 
 /** 缓存键 qFlags：bit0 = 质量口径开关，bit1 = npm 渠道开关（v4 起口径入键，切换即时生效） */
@@ -445,9 +544,13 @@ function snapshotUrlCandidates() {
  * 1.1.0 来源口径收紧：includeNpm=false 时剔除 source==='npm' 条目——它们不在官方
  * topic 页（github.com/topics/dsh-plugin）；0.9.5 用户决策变更，默认改为 true（开）。
  * npm 渠道开关打开时才纳入（设置 Tab 开关）。分类计数在剔除后统计，保证徽章数与视图一致。
- * 1.2.0 L2 引擎兼容：engineOn=true（默认）时剔除 engineCompat===0（dsh.engine 与桌面端
- * 运行时不兼容，装上即坏）条目；null（未声明/未校验）保留，交宿主安装时终审。 */
-function catIdxFromSnapshot(data, qualityOn, totalCount, maxAgeMs, includeNpm, engineOn) {
+ * 1.2.0 L2 引擎兼容：engineOn=true（默认）时剔除 engineCompat===0（官方 engines.dsh 与桌面端
+ * 运行时不兼容，装上即坏）条目；null（未声明/未校验）保留，交宿主安装时终审。
+ * 1.4.0 P0-1 平台兼容：platformOn=true（默认）时剔除 platformOk(raw, platform)===false 条目——
+ * 官方 bundle-platform.ts 对声明了 dsh.bundle.platforms 且不含当前宿主的组合包抛错跳过（装上即跳过）。
+ * platform 传 '' 表示无法判定 → platformOk 恒 true（不过滤，不误伤）。 */
+function catIdxFromSnapshot(data, qualityOn, totalCount, maxAgeMs, includeNpm, engineOn, platform, platformOn) {
+  platformOn = platformOn !== false // 默认开
   if (!data || !Array.isArray(data.items) || data.items.length < 1000) return null
   if (typeof data.builtAt !== 'number') return null
   if (maxAgeMs !== null && Date.now() - data.builtAt > maxAgeMs) return null
@@ -459,17 +562,18 @@ function catIdxFromSnapshot(data, qualityOn, totalCount, maxAgeMs, includeNpm, e
     if (!raw || (!(typeof raw.full_name === 'string' && raw.full_name) && !(typeof raw.npm === 'string' && raw.npm))) return null
     if (!includeNpm && raw.source === 'npm') continue // 1.1.0：不在官方 topic 的 npm-only 条目默认隐藏
     if (engineOn && raw.engineCompat === 0) continue // 1.2.0：引擎不兼容条目默认隐藏
+    if (platformOn && !platformOk(raw, platform)) continue // 1.4.0：平台不支持条目默认隐藏
     items.push(compactItem(raw))
   }
-  items = dedupItems(items) // 0.9.10 M2：同仓库多 npm 镜像条目收敛为一条（在计数与缓存写盘之前）
+  items = dedupItems(items) // 0.9.31：市场视图去重（npm 卡按包名、gh 裸卡按仓库；monorepo 多包各占一卡）在计数与缓存写盘之前
   if (items.length < 1000) return null // 剔除后过少视为口径异常（正常 both/github 占大头）
-  items.sort(rankSort)
+  items.sort((a, b) => rankSort(a, b, platform))
   var counts = {}
   for (var m = 0; m < items.length; m++) {
     var lab = classifyItem(items[m])
     counts[lab] = (counts[lab] || 0) + 1
   }
-  catIdxCacheSave({ v: CATIDX_RULES_VER, q: (qualityOn ? 1 : 0) + (includeNpm ? 2 : 0) + (engineOn ? 4 : 0), total: totalCount, builtAt: data.builtAt, counts: counts, items: items })
+  catIdxCacheSave({ v: CATIDX_RULES_VER, q: (qualityOn ? 1 : 0) + (includeNpm ? 2 : 0) + (engineOn ? 4 : 0) + (platformOn ? 8 : 0), total: totalCount, builtAt: data.builtAt, counts: counts, items: items })
   return { status: 'ready', done: items.length, total: totalCount, items: items, counts: counts, builtAt: data.builtAt, snapshot: true, factory: !maxAgeMs }
 }
 
@@ -791,7 +895,8 @@ if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exp
     specOf: specOf, shortSpecName: shortSpecName, parsePnpmCounts: parsePnpmCounts, fmtMMSS: fmtMMSS,
     classifyItem: classifyItem, subsOf: subsOf, classifySub: classifySub,
     catIdxFromSnapshot: catIdxFromSnapshot, // 2026-10-11：快照容量探针（scripts/verify-snapshot-capacity.cjs）需要全链路复现
-    compactItem: compactItem, rankSort: rankSort, dedupItems: dedupItems,
+    compactItem: compactItem, rankSort: rankSort, dedupItems: dedupItems, dedupByRepo: dedupByRepo, factoryTrim: factoryTrim, // 0.9.31：去重双口径（市场视图 / 仓库级裁剪）
+    platformOk: platformOk, normalizePlatform: normalizePlatform, detectPlatform: detectPlatform, // 1.4.0 P0-1：平台合规判定（官方 bundle-platform.ts 同源口径）
     buildSearchUrl: buildSearchUrl, topicOfSearchUrl: topicOfSearchUrl, isGithubSearchApi: isGithubSearchApi,
     hashStr: hashStr, isPlaceholderDesc: isPlaceholderDesc, llmUrl: llmUrl,
     unwrapRpc: unwrapRpc, extractBuildKeys: extractBuildKeys, cmpVersion: cmpVersion,

@@ -137,13 +137,32 @@ test('rankSort: 可装优先；不可装与引擎不兼容同罚位桶内按星�
   // no 与 ec0 同罚位（ra=1）：星数高者在前
   assert.deepEqual(arr.slice(1).map((x) => x.stargazers_count), [99999, 5])
 })
-test('dedupItems: 同 GitHub 仓库多 npm 镜像收敛为一条，可安装优先', () => {
+test('dedupItems: npm 卡按包名各占一卡（monorepo 多包不塌）；gh 裸卡在有可装 npm 卡时丢弃', () => {
+  const repo = 'OwNer/Repo'
+  const items = [
+    { full_name: repo, name: 'repo', npm: 'mirror-a', source: 'both', installable: true, stargazers_count: 10 },
+    { full_name: repo, name: 'repo', npm: 'repo', source: 'both', installable: true, stargazers_count: 10 },
+    { full_name: repo, name: 'repo', npm: '', source: 'github', installable: true, stargazers_count: 99 },
+  ]
+  const out = pure.dedupItems(items)
+  assert.equal(out.length, 2) // 两个 npm 卡保留，gh 裸卡被丢弃
+  assert.deepEqual(out.map((i) => i.npm).sort(), ['mirror-a', 'repo'])
+})
+test('dedupItems: 仓库无可装 npm 卡时保留 gh 裸卡（覆盖 dsh.bundle 只在 git HEAD 的场景）', () => {
+  const repo = 'OwNer/Repo'
+  const out = pure.dedupItems([
+    { full_name: repo, name: 'repo', npm: 'pkg', source: 'both', installable: false, stargazers_count: 1 },
+    { full_name: repo, name: 'repo', npm: '', source: 'github', installable: true, stargazers_count: 2 },
+  ])
+  assert.equal(out.length, 2) // npm 卡不可装不触发丢弃
+})
+test('dedupByRepo: 同仓库多 npm 镜像收敛为一条（出厂裁剪口径）', () => {
   const base = { full_name: 'OwNer/Repo', name: 'repo', source: 'github', stargazers_count: 10 }
   const items = [
     { ...base, npm: 'mirror-a', installable: false },
     { ...base, npm: 'repo', installable: true }, // npm 名与仓库名一致 → 胜出
   ]
-  const out = pure.dedupItems(items)
+  const out = pure.dedupByRepo(items)
   assert.equal(out.length, 1)
   assert.equal(out[0].npm, 'repo')
 })
@@ -154,6 +173,90 @@ test('dedupItems: npm-only 按包名去重；无身份条目防御性保留', ()
     { name: 'ghost' },
   ])
   assert.equal(out.length, 2)
+})
+
+// ---------- 1.4.0 P0-1：平台兼容判定（官方 bundle-platform.ts 同源口径）----------
+test('normalizePlatform: navigator 值 → 官方 Node 平台名', () => {
+  assert.equal(pure.normalizePlatform('Win32'), 'win32')
+  assert.equal(pure.normalizePlatform('MacIntel'), 'darwin')
+  assert.equal(pure.normalizePlatform('Linux x86_64'), 'linux')
+  assert.equal(pure.normalizePlatform('Android 13'), 'linux')
+  assert.equal(pure.normalizePlatform('CrOS x86_64'), 'linux')
+  assert.equal(pure.normalizePlatform(''), '')
+})
+test('platformOk: pfm 非法恒 false；省略 platforms 全平台 true；无平台不误伤', () => {
+  assert.equal(pure.platformOk({ pfm: true }, 'win32'), false)
+  assert.equal(pure.platformOk({ platformMalformed: true }, 'win32'), false) // 快照原始字段名
+  assert.equal(pure.platformOk({ platforms: null }, 'win32'), true)
+  assert.equal(pure.platformOk({}, 'win32'), true)
+  assert.equal(pure.platformOk({ platforms: ['darwin'] }, 'win32'), false)
+  assert.equal(pure.platformOk({ platforms: ['win32', 'darwin'] }, 'win32'), true)
+  assert.equal(pure.platformOk({ platforms: ['darwin'] }, ''), true) // 无法判定 → 不过滤
+})
+test('rankSort: 平台不支持与引擎不兼容同级沉底', () => {
+  const ok = { installable: true, stargazers_count: 1 }
+  const plat = { installable: true, platforms: ['darwin'], stargazers_count: 999 }
+  const arr = [plat, ok].sort((a, b) => pure.rankSort(a, b, 'win32'))
+  assert.equal(arr[0], ok)
+  assert.equal(arr[1], plat)
+})
+test('compactItem: 携带 pfm / platforms（pfm 仅非法时下发；旧快照缺字段 → 不下发 platforms）', () => {
+  assert.equal(pure.compactItem({ platforms: ['win32'] }).platforms.join(','), 'win32')
+  assert.equal(pure.compactItem({ platformMalformed: true }).pfm, true)
+  const legacy = pure.compactItem({})
+  assert.notEqual(legacy.pfm, true) // 缺省视为未声明（platformOk 判 false 以外的「未声明」）
+  assert.ok(!('platforms' in legacy)) // 省略=null=全平台；按需下发省体积
+  assert.equal(pure.platformOk(legacy, 'win32'), true) // 缺省 platformOk 不误伤
+})
+
+// ---------- 出厂快照 M1 裁剪（0.9.30 去重前置 / 0.9.31 仓库级收敛口径）----------
+test('factoryTrim: 裁剪前按仓库身份去重，重复行不挤占槽位', () => {
+  const mk = (fn, npm, stars, updated) => ({
+    full_name: fn, name: fn.split('/')[1], npm, source: npm ? 'both' : 'github',
+    installable: true, stargazers_count: stars, updated_at: updated || '',
+  })
+  const items = [
+    mk('A/one', 'one', 100, '2026-01-01'),
+    mk('A/one', 'mirror-a', 100, '2026-01-01'), // 同仓库重复行（hub 镜像/抢注包回挂）
+    mk('B/two', '', 90, '2026-01-02'),
+  ]
+  const r = pure.factoryTrim(items, 2, 0, 1)
+  assert.equal(r.rawTotal, 3)
+  assert.equal(r.uniqueTotal, 2)
+  assert.equal(r.items.length, 2)
+  assert.deepEqual([...new Set(r.items.map((i) => i.full_name))].sort(), ['A/one', 'B/two'])
+})
+test('factoryTrim: 同仓库重复行保留可安装/同名优先的那条', () => {
+  const mk = (npm, installable) => ({
+    full_name: 'A/repo', name: 'repo', npm, source: npm ? 'both' : 'github',
+    installable, stargazers_count: 10, updated_at: '2026-01-01',
+  })
+  const items = [
+    mk('mirror-x', true),
+    mk('repo', true), // npm 名与仓库名一致 → 胜出
+    mk('mirror-y', false),
+  ]
+  const r = pure.factoryTrim(items, 1, 0, 1)
+  assert.equal(r.items.length, 1)
+  assert.equal(r.items[0].npm, 'repo')
+})
+test('factoryTrim: npm-only 通道独立计数，不与 github/both 混排', () => {
+  const gh = { full_name: 'A/one', name: 'one', npm: '', source: 'github', installable: true, stargazers_count: 5, updated_at: '2026-01-01' }
+  const npmOnly = { full_name: '', name: 'pkg', npm: 'pkg', source: 'npm', installable: true, stargazers_count: 0, updated_at: '2026-01-02' }
+  const r = pure.factoryTrim([gh, npmOnly], 1, 1, 1)
+  assert.equal(r.keptGh.length, 1)
+  assert.equal(r.keptNpm.length, 1)
+  assert.equal(r.items.length, 2)
+})
+test('factoryTrim: github/both 保留量低于余量时抛错', () => {
+  const items = [{ full_name: 'A/one', name: 'one', npm: '', source: 'github', installable: true, stargazers_count: 1, updated_at: '' }]
+  assert.throws(() => pure.factoryTrim(items, 2, 0, 2), /github\/both 保留 1 < 2/)
+})
+test('factoryTrim: 同星按 updated_at 降序，结果确定', () => {
+  const mk = (updated) => ({ full_name: 'X/' + updated, name: updated, npm: '', source: 'github', installable: true, stargazers_count: 10, updated_at: updated })
+  const items = [mk('2026-01-01'), mk('2026-01-05'), mk('2026-01-03')]
+  const r = pure.factoryTrim(items, 2, 0, 1)
+  assert.deepEqual(r.items.map((i) => i.updated_at), ['2026-01-05', '2026-01-03'])
 })
 
 // ---------- 搜索 URL ----------

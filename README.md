@@ -72,12 +72,13 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 
 ### 宿主版本要求
 
-- `dsh.engine` 声明为 `>=0.1.7-rc.2`（偏宽）：**完整功能（设置卡片 / 对话节点 / locale 服务）需宿主 ≥0.2.0**；旧宿主上 inject 硬依赖项 fail-fast 拒载，代码内另有防御（能力检查 + 中文回退）。
+- `engines.dsh` 声明为 `>=0.1.7-rc.2`（偏宽）：**完整功能（设置卡片 / 对话节点 / locale 服务）需宿主 ≥0.2.0**；旧宿主上 inject 硬依赖项 fail-fast 拒载，代码内另有防御（能力检查 + 中文回退）。官方版本兼容字段为 `engines.dsh`（SemVer range），`dsh.engine` 宿主不读（宿主二进制检索 0 命中实证）。
 
 ### 数据来源与合规
 
 - 发现条件：`topic:dsh-plugin` + 近 12 个月有更新 + 名称/描述/标签含 `dsh`（★ 不限，完整覆盖官方 topic 页）
-- 分层合规：L1 声明 `dsh.bundle` 才可安装（宿主硬门禁）→ L2 `dsh.engine` 与桌面端 0.2.0-rc.2 semver 兼容（不兼容默认隐藏）→ L3 展示规范三件套（icon/locale/package.json exports）计 0-3 分仅作排序
+- 分层合规：L1 声明 `dsh.bundle` 才可安装（宿主硬门禁）→ L2 官方 `engines.dsh`（缺失回退 `@deepseek-ai/dsh*` peerDependencies）与桌面端 0.2.1-rc.5 semver 兼容（空/非法 range 判不兼容，不兼容默认隐藏）→ L3 展示规范三件套（icon/locale/package.json exports）计 0-3 分仅作排序，其中 **icon 合规从「字段存在」升级为「可加载」**（相对路径无 scheme/绝对/`..` + 扩展名限 svg/png/jpeg/webp，或导出 `./icon`；体积/`files` 覆盖待后续）
+- 平台兼容（1.4.0）：插件声明 `dsh.bundle.platforms`（官方 Node 平台名数组，省略=全平台）时，不含当前系统的条目默认隐藏——宿主 `bundle-platform.ts` 对该组合包抛错跳过（装上即被跳过）；声明格式非法（空数组/含非 Node 平台名/非数组）恒隐藏。**判定在客户端按 `navigator.platform` 做**：hub 快照是跨平台分发产物（CI 构建机是 linux），在数据源侧按构建机平台过滤会整批删掉其它平台专用插件；`platformOk` 纯函数对无法判定的宿主返回 true 不误伤
 - 目录按 GitHub 仓库身份（`full_name`）去重：同一仓库被多个 npm 镜像/抢注包回挂时收敛为一条（npm-only 条目按包名天然唯一）；保留优先级 可安装 > npm 名与仓库名一致 > 展示合规分 > 星数 > 来源 both>github>npm
 - npm 渠道仅作富化（版本/可安装性），不在官方 topic 页的纯 npm 条目默认显示（可关回官方 topic 纯口径）；宿主本体仓不借星
 
@@ -88,6 +89,7 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 - 折叠态选中分类提位：分类行默认单行折叠，低频分类被选中时高亮 chip 提到「全部」之后保证首行恒可见（纯函数 `promoteActiveCat` + 单测）；窄屏 ≤480px chips 墙替换为下拉选择器
 - 描述中文优先级：快照自带 `description_zh`（hub 侧 LLM 预翻译）> 运行时翻译（LLM 批量 → MyMemory 兜底）> 原文；搜索域包含译文，中文关键词可命中英文描述插件；本页有未译出条目时工具行显示「⚠ {n} 条未翻译」可点击重试
 - 界面文案只显示中文（EN 词典引用 ZH，完整走官方 locale 服务）；工具行控件统一 26px，卡片常驻 subtle 阴影
+- 平台兼容开关（1.4.0）：工具行与引擎兼容开关并列，默认开；关闭后被隐藏的「平台不支持」插件回到列表（排序沉底），与引擎开关同为客户端本地口径（缓存键含开关位）
 
 ### 安装与网络降级
 
@@ -103,7 +105,8 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 ### 数据通道与缓存
 
 - 快照通道：hub 每日 02:30/14:30 快照（jsDelivr 三镜像）+ 面板常驻每 30 分钟静默检查 +「官方源同步」实时全量直采兜底；新鲜度守卫 `SNAP_STALE_MS=13h` 对齐 hub 双跑间隔，超龄源不采用继续试下一候选，全源耗尽取最新陈旧版兜底（离线可用性优先）
-- 出厂快照：发版时内联按星裁剪的 GitHub/both Top 1500（约 0.77MB，原料 13748 条；完整目录打开市场后在线补齐），裁剪参数见 `scripts/assemble-client.cjs --keep/--npm-keep`；**原料 `assets/cards-snapshot.json` 不入库**（git 体积治理，2026-10-12 方案 A）——CI 发版自动拉取，本地用 `node scripts/refresh-factory-snapshot.cjs`（候选清单与客户端 `SNAPSHOT_URLS` 单一来源）
+- 出厂快照：发版时内联按星裁剪的 GitHub/both Top 1500（约 0.83MB，原料随 hub 批次增长；完整目录打开市场后在线补齐），裁剪参数见 `scripts/assemble-client.cjs --keep/--npm-keep`；**原料 `assets/cards-snapshot.json` 不入库**（git 体积治理，2026-10-12 方案 A）——CI 发版自动拉取，本地用 `node scripts/refresh-factory-snapshot.cjs`（候选清单与客户端 `SNAPSHOT_URLS` 单一来源）
+- **出厂裁剪去重前置 + 去重双口径**（0.9.30 去重前置 / 0.9.31 拆分口径）：hub 快照同一仓库可被多个 npm 镜像/抢注包回挂（2026-10-30 批次实测 22274 raw → 19208 唯一，重复行 13.76%），旧裁剪直接对原始行按星取 Top1500 → 唯一仓库只剩 **1080**（28% 槽位被重复行挤占，离线首屏白丢 420 个插件）。修复：裁剪前先 `dedupByRepo` 收敛为每仓库一条再取星序 Top1500 → 唯一仓库恢复到 **1500**。**0.9.31 起去重拆双口径**：离线裁剪用仓库级 `dedupByRepo`（每仓一条，最大化唯一仓库覆盖）；在线市场视图用 `dedupItems`（npm 卡身份=npm 包名，monorepo 多包各占一卡，与 hub `dedupAfterProbe` 对齐；gh 裸卡在仓库存在可装 npm 卡时丢弃）。纯函数 `factoryTrim`/`dedupItems`/`dedupByRepo`（30 块，可单测）+ 单测覆盖。发版固定顺序不变：`node scripts/refresh-factory-snapshot.cjs` → `pnpm build` → 提交 `lib/` → 打 tag
 - 缓存配额适配：1.4 万条目下 localStorage 同源共享配额必超——`zhmap`（翻译映射）优先写入保住反英文固化链路；catidx 全量缓存超限按设计放弃持久化（jsDelivr HTTP 缓存承接重拉 + 重建 ~230ms 兜底）；容量探针 `scripts/verify-snapshot-capacity.cjs` 可复现实测
 - 重要数据更新后需 purge jsDelivr CDN 缓存（fastly/gcore 镜像域不响应 purge、缓存滞后 12-24h）
 
