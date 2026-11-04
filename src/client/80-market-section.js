@@ -732,7 +732,10 @@ function createCommunitySection(ctx, form) {
           // 0.8.9：宿主热卸载后浏览器仍残留旧插件 JS —— 收到卸载事件延迟刷新页面，彻底清除残留功能
           // ⚠️ 事件负载可能是对象或数组（官方客户端测试用 emit(..., [{reason}]) 形态），两种都兼容
           var ev = Array.isArray(chg) ? chg[0] : chg
-          if (ev && ev.reason === 'remove' && !pageReloadTimer) {
+          // 0.9.32：更新降级梯内部会先 removeBundle（宿主随即广播 reason=remove）——此刻若触发本刷新，
+          // 在飞的重装 RPC 会被整页重载打断，插件停在「已卸载未装回」（0.9.32 真机验证实锤踩坑）。
+          // 仅抑制 op=update 进行中的窗口；真正的手动卸载仍按原样延迟刷新清理。
+          if (ev && ev.reason === 'remove' && !pageReloadTimer && (!activeOpRef.current || activeOpRef.current.op !== 'update')) {
             pageReloadTimer = setTimeout(function () { window.location.reload() }, 1200)
           }
         }),
@@ -1047,6 +1050,9 @@ function createCommunitySection(ctx, form) {
         // catch 里 classifyNetError(m) 的英文正则认不出译文，梯子会整体跳过（17:05 真机踩坑：
         // 预检 Empty reply → 中文报错「自动降级未成功」但梯子根本没跑）。这里从原始 diagnostic 重分类。
         e2.netKey = netKeyFromChange(res)
+        // 0.9.32：宿主原始错误码随 Error 传递（0.9.25 方法论：译文不可二次识别）——
+        // update 降级梯子按 changeCode === 'already-installed' 命中，不依赖中文译文匹配
+        e2.changeCode = String((res.error && res.error.code) || '')
         // 0.9.28：构建授权信息随 Error 传递（0.9.25 方法论——译文不可二次识别）。
         // 键源优先级：res.pendingBuilds（宿主对本次尝试记录的权威待构建清单，重试必须逐字匹配，
         // 否则 stale-approval——真机实测 hint 文案里的键与宿主记录不一致）> 原始 diagnostic 解析
@@ -1110,6 +1116,17 @@ function createCommunitySection(ctx, form) {
           }
           stepOp('download')
           return pm.installBundle(use, { enabled: false, requestId: requestId }).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opUpdate', { name: name })) })
+        })
+        .catch(function (e) {
+          // 0.9.32：热更新宿主（client-hmr 激活）installBundle 对已装包一律 ManagementFailure('already-installed')——
+          // 宿主官方更新语义此时是「先卸载再安装」（plugin-manager README: An explicit update removes the installed
+          // package and installs the target），且 HMR 下卸载不受 stop-profile 检查限制（hmr 存在即跳过）→
+          // 自动降级重试，覆盖两种宿主模式：HMR 开=卸载重装；HMR 关=此分支不命中，维持原覆盖安装
+          if ((e && e.changeCode) !== 'already-installed') throw e
+          setMessage(T('mk.updateHmrRetry'))
+          var retryId = newUuid()
+          return pm.removeBundle(name).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opRemove', { name: name })) })
+            .then(function () { stepOp('download'); return pm.installBundle(use, { enabled: false, requestId: retryId }).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opUpdate', { name: name })) }) })
         })
         .then(function (app) { stepOp('enable'); return pm.setBundleEnabled(name, true).then(unwrapRpc).catch(function () { /* 保持原启用状态失败时回退 */ }).then(function () { return app }) })
         .then(function (app) { return refreshInstalled().then(function () { return app }) })

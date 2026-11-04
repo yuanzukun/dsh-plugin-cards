@@ -94,6 +94,7 @@ git push origin main && git tag v0.9.4 && git push origin v0.9.4
 ### 安装与网络降级
 
 - 安装/更新/启停/卸载的生效语义对齐官方：宿主无 HMR 时返回 `restart-required`，界面提示「下次启动 DeepSeek Harness 后加载」（桌面端安装后需重启宿主生效，刷新页面无效）
+- **热更新宿主更新自动降级**（0.9.32）：宿主激活 Web 客户端热更新（`@deepseek-ai/dsh-client-hmr`）时，`installBundle` 对已装包一律抛 `already-installed`（HMR 下官方更新语义 = 先卸载再安装，见宿主 plugin-manager README；非 HMR 才是覆盖安装 + `restart-required`）——旧更新流程只跳过 inspect 预检，直接撞死在 install 拒绝上，已装插件全部无法更新（2026-11-04 真机：dsh-purge 更新 0:01 秒失败）。修复：`checkChange` 随 Error 传递宿主原始错误码 `changeCode`（0.9.25 方法论，译文不可二次识别），`updateBundle` 捕获 `already-installed` 后自动降级 `removeBundle → installBundle → 恢复启用`；HMR 下卸载不受 `stop-profile` 限制（宿主该检查 hmr 存在即跳过），两种宿主模式全覆盖
 - **安装成功横幅带实装版本**（0.9.28）：横幅从宿主 `BundleInfo.version` 取本地真实版本（如 `已安装并启用：github:o/r（v1.1.71；…）`）——市场卡版本来自快照元数据（最长滞后一个快照周期），git HEAD 安装实装的是实时最新，卡面与横幅口径分裂会误导用户
 - **市场路由状态持久化**（0.9.28）：搜索词/Tab/分类/子分类存 `dcards.mktview.v1`（localStorage，形状校验后恢复）——卸载/安装完成后宿主整页刷新会重挂载面板，不持久化则搜索词清空、被踢出市场上下文（真机 E2E 实证）；「清除筛选」同步清存储
 - **git 依赖构建授权拦截**（0.9.28）：pnpm 11 对 git 托管依赖的 prepare 构建脚本默认硬拒绝（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`），客户端识别该错误并换人话 + 展示 pnpm hint 打印的精确授权键；该路径程序化授权重试**结构性不可用**（宿主 `approveBuilds` 只批 pnpm 预写进 pnpm-workspace.yaml 的占位条目，硬失败路径无占位——真机两轮 + asar 源码双证），自救 = 把精确键（**两侧加英文双引号**，`@` 是 YAML 保留字符）写入 `allowBuilds:` 段后重试，或改走 npm 渠道（免授权）。generic 构建拦截（registry 包 Ignored build scripts）保留「授权构建并重试」流，且载荷已修正为宿主 wire schema 要求的字符串数组（旧对象载荷被边界校验拒绝，该流此前在宿主 0.2.0-rc.2 上整体失效）

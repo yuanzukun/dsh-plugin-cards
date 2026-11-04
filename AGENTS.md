@@ -32,6 +32,12 @@
 - 不向任何第三方策展站/聚合站提交收录；仓库保持 `dsh-plugin` topic 标签。
 - 官方桌面端内置市场（聚合 npm 数据）属官方体系，不在此列。
 
+## 官方桌面端取证纪律（2026-11-05）
+
+- **严禁修改官方桌面端的任何代码与产物**：app.asar / app.asar.unpacked / resources 下宿主运行时、安装目录内官方包、`~/.dsh/profiles/*` 内官方包（node_modules、patch 状态等）一律**只读**。
+- **允许并鼓励只读取证定位问题**：grep / dd 等检索 app.asar、读宿主包 README / locale / package.json、提取代码片段做根因分析（0.9.32 already-installed 取证即范例）；取证不改文件，临时文件用完即清。
+- **宿主行为问题只做插件侧适配**：降级 / 绕行 / 文案，不改宿主；取证结论随修复沉淀进 README 与 docs（注明出处与版本），供下次直接引用。
+
 ## 环境与构建
 
 - 本地开发循环：改码 → `pnpm build` → `dsh plugin --profile web add <本地路径>` → 重启 `dsh web` → 浏览器 DevTools。

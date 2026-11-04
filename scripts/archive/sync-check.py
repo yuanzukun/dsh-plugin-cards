@@ -2,16 +2,23 @@
 """只读对比：本地出厂快照(2026-09-25T14:11Z) vs GitHub topic:dsh-plugin 当前状态。
 未认证限流 10 req/min -> 请求间 sleep 7s。"""
 import json, time, urllib.request, urllib.parse, ssl
+from pathlib import Path
 
 CUTOFF = "2026-09-25T13:56:40Z"   # 快照数据截止时刻
 CREATED_AFTER = "2026-09-25"       # 新插件判定
 QDATE = "2025-09-28"               # quality 口径：近12月
 HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "dsh-plugin-cards-dev"}
+API_ORIGIN = "https://api.github.com"
+API_PATH = "/search/repositories"
 ctx = ssl.create_default_context()
+OUT_PATH = Path(__file__).resolve().parent / "sync-check-result.json"
 
 def api(q, per_page=100, page=1):
-    url = "https://api.github.com/search/repositories?" + urllib.parse.urlencode({
+    url = API_ORIGIN + API_PATH + "?" + urllib.parse.urlencode({
         "q": q, "sort": "updated", "order": "desc", "per_page": per_page, "page": page})
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" or parts.hostname != "api.github.com":
+        raise ValueError("unexpected API origin: %r" % url)
     req = urllib.request.Request(url, headers=HEADERS)
     for attempt in range(4):
         try:
@@ -62,6 +69,6 @@ d = api("topic:dsh-plugin", per_page=1)
 results["all_total_now"] = d.get("total_count")
 print("④ topic:dsh-plugin 全口径 total =", d.get("total_count"))
 
-with open(r"D:/导航/dsh-plugin/scripts/sync-check-result.json", "w", encoding="utf-8") as f:
+with OUT_PATH.open("w", encoding="utf-8") as f:
     json.dump(results, f, ensure_ascii=False, indent=2)
-print("saved -> scripts/sync-check-result.json")
+print("saved ->", OUT_PATH)
