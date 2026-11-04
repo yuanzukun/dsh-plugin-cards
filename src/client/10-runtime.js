@@ -283,10 +283,19 @@ var ZH = {
   'mk.updateFailed': '❌ 更新失败：',
   // 0.9.32：热更新宿主（client-hmr 激活）installBundle 拒绝覆盖安装已装包 → 更新自动降级为官方「先卸载再安装」语义
   'mk.updateHmrRetry': '宿主热更新模式下拒绝覆盖安装，自动改为先卸载再安装…',
+  // 0.9.33：降级梯重装失败的回滚/孤儿文案（桌面端日志实证：重装被打断或失败会让插件停在已卸载态）
+  'mk.updateRollbackTry': '重装失败，正在自动回滚旧版…',
+  'mk.updateGitRetry': '重装失败（git 来源无法锁定旧版本），自动再试一次…',
+  'mk.updateRollback': '⚠️ 更新失败，已自动回滚到旧版：{name}（v{ver}）——',
+  'mk.updateOrphan': '❌ 更新失败，且自动恢复未成功：{name} 已被卸载（配置与数据无损）——请到「插件市场」重新安装：',
+  'mk.opRollback': '回滚 {name} ',
+  // 0.9.33：pnpm 操作进行中禁刷新提示（进度卡内常驻一行）
+  'mk.noRefreshTip': '操作进行中：请勿刷新或关闭页面（中途刷新会打断安装/更新，可能使插件停在半途）',
+  'mk.errIncompatible': '插件声明的宿主版本要求与当前 DSH 不兼容（宿主拒绝安装）——请等插件作者适配新版宿主，或核对该插件的 engines.dsh 声明',
   'mk.enableFailedItem': '{name}（{msg}）',
   // 0.9.29：宿主 import 失败人话化（真机取证 FSMargoo/dsh-at-file：peer 依赖宿主包未随装 → failed to import 天书）
   'mk.errImportFail': '插件代码加载失败（宿主无法 import 插件入口）：插件文件已装好，但作者打包可能把宿主内置包声明为未随装的 peer 依赖，或与当前宿主版本不兼容——建议向插件作者反馈，或在「已安装」区卸载止损',
-  'mk.opFailLabel': '{label}失败：',
+  'mk.opFailLabel': '{label} 失败：',
   'mk.opCancelled': '{label}已取消（宿主已回滚变更）',
   'mk.rpcFailed': 'RPC 调用失败',
   'mk.errSource': '源返回异常: ',

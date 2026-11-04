@@ -703,7 +703,25 @@ function createCommunitySection(ctx, form) {
     var STEP_LABEL = { prepare: 'mk.preparing', verify: 'mk.sbarVerify', download: 'mk.sbarDownload', enable: 'mk.sbarEnable' }
     // 0.9.6：op 类型 → 步骤条组成（remove 单步无步骤条；build 授权重试从下载开始）
     var OP_STEPS = { install: ['verify', 'download', 'enable'], update: ['verify', 'download', 'enable'], build: ['download', 'enable'], remove: [] }
+    // 0.9.33：mutating 操作全局互斥链——桌面端日志实证（0.9.32 发版夜）：更新梯子的卸载/重装若与其他 pnpm 操作
+    // 交错或被页面刷新打断，插件会停在「已卸载未装回」孤儿态（dsh-purge / dsh-think-translate 双双丢失）。
+    // update / build / uninstall 统一过链串行；install 走 pumpQueue（自带 activeOpRef 护栏）不重复包装。
+    var opChainRef = useRef(null)
+    var runExclusiveOp = useCallback(function (fn) {
+      var base = opChainRef.current || Promise.resolve()
+      var run = base.then(fn, fn)
+      opChainRef.current = run.then(function () {}, function () {}) // 吞链上错误，链永不断
+      return run
+    }, [])
+    var activeOpCountRef = useRef(0) // 0.9.33：在飞操作计数（含排队中）——整页刷新统一延迟到最后一个操作结束
+    var pendingReloadRef = useRef(false)
+    var requestPageReload = useCallback(function (delay) {
+      pendingReloadRef.current = true
+      if (activeOpCountRef.current > 0) return
+      if (!pageReloadTimer) pageReloadTimer = setTimeout(function () { window.location.reload() }, delay || 1500)
+    }, [])
     var beginOp = useCallback(function (label, requestId, op, display, spec) {
+      activeOpCountRef.current += 1
       activeOpRef.current = { requestId: requestId || null, startedAt: Date.now(), step: 'prepare', exitCode: null, op: op || '', display: display || label, spec: spec || '' }
       setProg({ label: label, op: op || '', display: display || label, spec: spec || '', phase: T('mk.preparing'), startedAt: Date.now(), line: '', exitCode: null, counts: null, step: 'prepare' })
       setLastResult(null)
@@ -714,7 +732,13 @@ function createCommunitySection(ctx, form) {
     }, [])
     var endOp = useCallback(function () {
       activeOpRef.current = null
+      activeOpCountRef.current = Math.max(0, activeOpCountRef.current - 1)
       setProg(null)
+      // 0.9.33：排队中的整页刷新在此落地——最后一个操作收尾后再刷新，绝不打断在飞操作
+      if (pendingReloadRef.current && activeOpCountRef.current === 0) {
+        pendingReloadRef.current = false
+        if (!pageReloadTimer) pageReloadTimer = setTimeout(function () { window.location.reload() }, 400)
+      }
     }, [])
     useEffectFn(function () {
       var remote = ctx.remote
@@ -734,9 +758,9 @@ function createCommunitySection(ctx, form) {
           var ev = Array.isArray(chg) ? chg[0] : chg
           // 0.9.32：更新降级梯内部会先 removeBundle（宿主随即广播 reason=remove）——此刻若触发本刷新，
           // 在飞的重装 RPC 会被整页重载打断，插件停在「已卸载未装回」（0.9.32 真机验证实锤踩坑）。
-          // 仅抑制 op=update 进行中的窗口；真正的手动卸载仍按原样延迟刷新清理。
+          // 仅抑制 op=update 进行中的窗口；0.9.33 起刷新统一走 requestPageReload（有在飞操作时自动延迟）。
           if (ev && ev.reason === 'remove' && !pageReloadTimer && (!activeOpRef.current || activeOpRef.current.op !== 'update')) {
-            pageReloadTimer = setTimeout(function () { window.location.reload() }, 1200)
+            requestPageReload(1200)
           }
         }),
         remote.$on('plugin-manager/install-log', function (chunk) {
@@ -851,8 +875,10 @@ function createCommunitySection(ctx, form) {
       var qPause = false // 0.9.6：队列泵暂停标记（失败/构建拦截时置 true，等用户处理后手动继续）
       var requestId = newUuid()
       beginOp(T('mk.opInstall', { spec: spec }), requestId, 'install', repoName || shortSpecName(spec), spec)
-      Promise.resolve()
-        .then(function () { return snapshotNames() })
+      // 0.9.33：入全局互斥链（降级梯的重入调用全部经 setTimeout/异步探测延迟触发，只会排队不会死锁）
+      runExclusiveOp(function () {
+        return Promise.resolve()
+          .then(function () { return snapshotNames() })
         .then(function (before) { stepOp('verify'); return pm.inspect(spec, {}).then(unwrapRpc).then(function (inspection) { return { before: before, inspection: inspection } }) })
         .then(function (ctx2) {
           if (!ctx2.inspection || ctx2.inspection.status !== 'accepted') {
@@ -955,7 +981,8 @@ function createCommunitySection(ctx, form) {
           if (pumpTimerRef.current) return
           pumpTimerRef.current = setTimeout(function () { pumpTimerRef.current = null; pumpQueue() }, 1200)
         })
-    }, [pm, refreshInstalled, beginOp, stepOp, endOp, clearMsg, finishOp, pumpQueue])
+      })
+    }, [pm, refreshInstalled, beginOp, stepOp, endOp, clearMsg, finishOp, pumpQueue, runExclusiveOp])
     installRef.current = install // 0.9.6：pumpQueue 经 ref 调最新 install（解循环引用）
 
     /** 宿主管理操作错误 → 面板友好文案（源码错误码：stop-profile / bundle-in-use / not-removable / management-required）。 */
@@ -968,6 +995,8 @@ function createCommunitySection(ctx, form) {
       // 0.9.23：宿主 ChangeResult 的 kind 键（classifyInstallFailure 产物）直接命中网络类
       if (m === 'network' || m === 'timeout') return T('mk.errNet')
       if (m.indexOf('already-installed') !== -1) return T('mk.errAlreadyInstalled')
+      // 0.9.33：宿主引擎兼容拒绝（desktop 日志实证：dsh-better-sidebar v0.30.0 直出英文码）→ 人话 + 归因
+      if (m.indexOf('incompatible-version') !== -1) return T('mk.errIncompatible')
       // 0.9.7：pnpm 11 默认 24h 新包冷却拦截（装完刚发布的版本再卸载/更新必踩）→ 原因 + 自救，替代天书
       if (m.indexOf('ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION') !== -1 || m.indexOf('minimumReleaseAge cutoff') !== -1) {
         var flagged = (/\n\s+(\S+@\S+) was published at/.exec(m) || [])[1] || ''
@@ -1086,59 +1115,95 @@ function createCommunitySection(ctx, form) {
       setConfirmRemove('')
       setBusy('remove:' + name); clearMsg()
       beginOp(T('mk.opRemove', { name: name }), null, 'remove', name, name)
-      Promise.resolve().then(function () { return pm.removeBundle(name).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opRemove', { name: name })) }) })
-        .then(function (app) { return refreshInstalled().then(function () { return app }) })
-        .then(function (app) { finishOp('ok', T(app === 'restart-required' ? 'mk.removedOkRestart' : 'mk.removedOk', { name: name }), null) })
-        .catch(function (e) { finishOp('fail', T('mk.removeFailed') + friendlyManageError(e), null) })
-        .then(function () { setBusy(''); endOp() })
-    }, [pm, refreshInstalled, confirmRemove, beginOp, endOp, clearMsg, finishOp])
+      // 0.9.33：卸载也是 pnpm 操作，入全局互斥链（与更新梯子的重装互斥）
+      runExclusiveOp(function () {
+        return Promise.resolve().then(function () { return pm.removeBundle(name).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opRemove', { name: name })) }) })
+          .then(function (app) { return refreshInstalled().then(function () { return app }) })
+          .then(function (app) { finishOp('ok', T(app === 'restart-required' ? 'mk.removedOkRestart' : 'mk.removedOk', { name: name }), null) })
+          .catch(function (e) { finishOp('fail', T('mk.removeFailed') + friendlyManageError(e), null) })
+          .then(function () { setBusy(''); endOp(); pumpQueue() })
+      })
+    }, [pm, refreshInstalled, confirmRemove, beginOp, endOp, clearMsg, finishOp, runExclusiveOp, pumpQueue])
 
-    var updateBundle = useCallback(function (name, spec, targetV) {
+    var updateBundle = useCallback(function (name, spec, targetV, oldV) {
       // 0.8.17：有精确目标版本时用 name@version 安装（绕开镜像 @latest dist-tag 滞后装旧版的坑，实测 whale 装到 0.3.14）；
       // git:/tgz/path spec 原样（追加 @version 语义不同）
       var use = spec || (name + '@latest')
+      var pinnedSrc = true // 目标 spec 可否客户端锁版本：registry 名/范围可 name@旧版精确回滚；git/tgz/path 不可（旧 HEAD 客户端不可知）
       if (targetV) {
         if (!spec) use = name + '@' + targetV
         else if (spec.indexOf('github:') !== 0 && !/(\.tgz|\.tar\.gz)$/i.test(spec) && !/^[./~]|[a-zA-Z]:[\\/]/.test(spec)) use = spec + '@' + targetV
       }
+      if (spec && (spec.indexOf('github:') === 0 || /(\.tgz|\.tar\.gz)$/i.test(spec) || /^[./~]|[a-zA-Z]:[\\/]/.test(spec))) pinnedSrc = false
+      // 0.9.33：回滚 spec——registry 源退回精确旧版；git/tgz 源无法锁旧版 → 失败时同 spec 再试一次
+      var rbSpec = pinnedSrc ? (name + '@' + (oldV || 'latest')) : use
       setBusy('update:' + name); clearMsg()
       var requestId = newUuid()
       beginOp(T('mk.opUpdate', { name: name }), requestId, 'update', name, use)
-      Promise.resolve()
-        .then(function () { stepOp('verify'); return pm.inspect(use, {}).then(unwrapRpc) })
-        .then(function (inspection) {
-          if (!inspection || inspection.status !== 'accepted') {
-            var reason = inspection && inspection.reason ? inspection.reason : T('mk.reasonUnknown')
-            var probe = String((inspection && inspection.problem) || '') + ' ' + reason
-            // 0.8.17 宿主 inspect 对已装包一律 refused already-installed（index.ts:372/377），更新语义下这不是错误 → 跳过预检
-            // ⚠️ 跳过预检 ≠ 跳过安装：无论走哪个分支都必须落到下方 installBundle（0.8.17 首版曾在此 return undefined 导致假成功）
-            if (probe.indexOf('already-installed') === -1) throw new Error(T('mk.reject') + reason)
-          }
-          stepOp('download')
-          return pm.installBundle(use, { enabled: false, requestId: requestId }).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opUpdate', { name: name })) })
-        })
-        .catch(function (e) {
-          // 0.9.32：热更新宿主（client-hmr 激活）installBundle 对已装包一律 ManagementFailure('already-installed')——
-          // 宿主官方更新语义此时是「先卸载再安装」（plugin-manager README: An explicit update removes the installed
-          // package and installs the target），且 HMR 下卸载不受 stop-profile 检查限制（hmr 存在即跳过）→
-          // 自动降级重试，覆盖两种宿主模式：HMR 开=卸载重装；HMR 关=此分支不命中，维持原覆盖安装
-          if ((e && e.changeCode) !== 'already-installed') throw e
-          setMessage(T('mk.updateHmrRetry'))
-          var retryId = newUuid()
-          return pm.removeBundle(name).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opRemove', { name: name })) })
-            .then(function () { stepOp('download'); return pm.installBundle(use, { enabled: false, requestId: retryId }).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opUpdate', { name: name })) }) })
-        })
-        .then(function (app) { stepOp('enable'); return pm.setBundleEnabled(name, true).then(unwrapRpc).catch(function () { /* 保持原启用状态失败时回退 */ }).then(function () { return app }) })
-        .then(function (app) { return refreshInstalled().then(function () { return app }) })
-        .then(function (app) {
-          finishOp('ok', T(app === 'restart-required' ? 'mk.updatedOkRestart' : 'mk.updatedOk', { name: name }), null)
-          // 0.8.22：更新成功后自动整页刷新（复用卸载同款 pageReloadTimer 机制）。
-          // 关闭设置浮层 ≠ 刷新页面：旧版插件 JS 仍驻留内存，界面/版本号不会变——必须整页重载才会加载新 client.js
-          if (!pageReloadTimer) pageReloadTimer = setTimeout(function () { window.location.reload() }, 1500)
-        })
-        .catch(function (e) { finishOp('fail', T('mk.updateFailed') + friendlyManageError(e), null) })
-        .then(function () { setBusy(''); endOp() })
-    }, [pm, refreshInstalled, beginOp, stepOp, endOp, clearMsg, finishOp])
+      // 0.9.33：入全局互斥链（排队时进度卡停在「准备中」，前序操作收尾后自动开跑）
+      runExclusiveOp(function () {
+        return Promise.resolve()
+          .then(function () { stepOp('verify'); return pm.inspect(use, {}).then(unwrapRpc) })
+          .then(function (inspection) {
+            if (!inspection || inspection.status !== 'accepted') {
+              var reason = inspection && inspection.reason ? inspection.reason : T('mk.reasonUnknown')
+              var probe = String((inspection && inspection.problem) || '') + ' ' + reason
+              // 0.8.17 宿主 inspect 对已装包一律 refused already-installed（index.ts:372/377），更新语义下这不是错误 → 跳过预检
+              // ⚠️ 跳过预检 ≠ 跳过安装：无论走哪个分支都必须落到下方 installBundle（0.8.17 首版曾在此 return undefined 导致假成功）
+              if (probe.indexOf('already-installed') === -1) throw new Error(T('mk.reject') + reason)
+            }
+            stepOp('download')
+            return pm.installBundle(use, { enabled: false, requestId: requestId }).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opUpdate', { name: name })) })
+          })
+          .catch(function (e) {
+            // 0.9.32：热更新宿主（client-hmr 激活）installBundle 对已装包一律 ManagementFailure('already-installed')——
+            // 宿主官方更新语义此时是「先卸载再安装」（plugin-manager README: An explicit update removes the installed
+            // package and installs the target），且 HMR 下卸载不受 stop-profile 检查限制（hmr 存在即跳过）→
+            // 自动降级重试，覆盖两种宿主模式：HMR 开=卸载重装；HMR 关=此分支不命中，维持原覆盖安装
+            if ((e && e.changeCode) !== 'already-installed') throw e
+            setMessage(T('mk.updateHmrRetry'))
+            var removed = false
+            var retryId = newUuid()
+            return pm.removeBundle(name).then(unwrapRpc).then(function (res) { removed = true; return checkChange(res, T('mk.opRemove', { name: name })) })
+              .then(function () {
+                stepOp('download')
+                return pm.installBundle(use, { enabled: false, requestId: retryId }).then(unwrapRpc).then(function (res) { return checkChange(res, T('mk.opUpdate', { name: name })) })
+              }, function (e2) {
+                // 0.9.33：重装失败——桌面端日志实证（0.9.32 发版夜）重装被打断/失败会让插件停在孤儿态：
+                // registry 源自动回滚精确旧版；git/tgz 源无法锁旧 HEAD → 同 spec 再试一次（第二Chance）。
+                // 卸载本身就失败 → 旧版仍在原位，无需回滚。回滚结果随 Error 传递给结果卡（warn/fail + 指引）。
+                if (!removed) throw e2
+                var rbId = newUuid()
+                setMessage(T(pinnedSrc ? 'mk.updateRollbackTry' : 'mk.updateGitRetry', { name: name }))
+                return pm.installBundle(rbSpec, { enabled: true, requestId: rbId }).then(unwrapRpc).then(function (res) { return checkChange(res, T(pinnedSrc ? 'mk.opRollback' : 'mk.opUpdate', { name: name })) })
+                  .then(function () {
+                    if (!pinnedSrc) return undefined // git 源重试成功 = 更新完成，继续下方 enable 流程
+                    e2.rollbackVer = oldV || ''
+                    throw e2
+                  }, function () {
+                    e2.rollbackFail = true
+                    throw e2
+                  })
+              })
+          })
+          .then(function (app) { stepOp('enable'); return pm.setBundleEnabled(name, true).then(unwrapRpc).catch(function () { /* 保持原启用状态失败时回退 */ }).then(function () { return app }) })
+          .then(function (app) { return refreshInstalled().then(function () { return app }) })
+          .then(function (app) {
+            finishOp('ok', T(app === 'restart-required' ? 'mk.updatedOkRestart' : 'mk.updatedOk', { name: name }), null)
+            // 0.8.22：更新成功后自动整页刷新（复用卸载同款机制）。0.9.33：走 requestPageReload 统一入口——
+            // 有在飞/排队操作时延迟到最后一个操作收尾（1.5s 定时器曾在连续更新场景打断下一梯子的在飞 RPC）
+            requestPageReload(1500)
+          })
+          .catch(function (e) {
+            // 0.9.33：回滚成功 → warn 卡（旧版已恢复）；回滚也失败 → fail 卡带重装指引；并刷新已安装区反映真实状态
+            if (e && e.rollbackVer !== undefined) finishOp('warn', T('mk.updateRollback', { name: name, ver: e.rollbackVer }) + friendlyManageError(e), null)
+            else if (e && e.rollbackFail) finishOp('fail', T('mk.updateOrphan', { name: name }) + friendlyManageError(e), null)
+            else finishOp('fail', T('mk.updateFailed') + friendlyManageError(e), null)
+            return refreshInstalled().catch(function () {})
+          })
+          .then(function () { setBusy(''); endOp(); pumpQueue() })
+      })
+    }, [pm, refreshInstalled, beginOp, stepOp, endOp, clearMsg, finishOp, runExclusiveOp, pumpQueue, requestPageReload])
 
     var retryWithBuilds = useCallback(function () {
       if (!pendingBuilds) return
@@ -1152,26 +1217,29 @@ function createCommunitySection(ctx, form) {
       for (var i = 0; i < p.keys.length; i++) approved.push(p.keys[i])
       var requestId = newUuid()
       beginOp(T('mk.opInstallBuild', { spec: p.spec }), requestId, 'build', shortSpecName(p.spec), p.spec)
-      Promise.resolve()
-        .then(function () { return snapshotNames() })
-        .then(function (before) { stepOp('download'); return pm.installBundle(p.spec, { enabled: false, requestId: requestId, approvedBuilds: approved }).then(unwrapRpc).then(function (res) { return { before: before, app: checkChange(res, T('mk.opInstall', { spec: p.spec })) } }) })
-        .then(function (ctx2) { stepOp('enable'); return enableNewBundles(ctx2.before).then(function (res) { return { failedEnables: res.failed, verMap: res.verMap, app: ctx2.app } }) })
-        .then(function (ctx3) { return refreshInstalled().then(function () { return ctx3 }) })
-        .then(function (ctx3) {
-          if (ctx3.failedEnables.length) finishOp('warn', T('mk.installedEnableFailed', { spec: p.spec, list: ctx3.failedEnables.join('；') }), null)
-          else {
-            // 0.9.28：横幅带实装版本（与 install 主链同款；grantedOk 文案附版本后缀）
-            var okVer = ''
-            var vm = ctx3.verMap || {}
-            for (var vk in vm) { if (vm[vk]) { okVer = vm[vk]; break } }
-            var restart1 = ctx3.app === 'restart-required'
-            var base = T(restart1 ? 'mk.grantedOkRestart' : 'mk.grantedOk', { spec: p.spec })
-            finishOp('ok', okVer ? base + '（v' + okVer + '）' : base, null)
-          }
-        })
-        .catch(function (e) { finishOp('fail', T('mk.installFailed') + friendlyManageError(e), { spec: p.spec, repoName: '' }) }) // 0.9.23：网络类天书换人话（与 install 主链同款）
-        .then(function () { setBusy(''); endOp() })
-    }, [pm, refreshInstalled, pendingBuilds, beginOp, stepOp, endOp, clearMsg, finishOp])
+      // 0.9.33：入全局互斥链（与更新梯子/卸载互斥）
+      runExclusiveOp(function () {
+        return Promise.resolve()
+          .then(function () { return snapshotNames() })
+          .then(function (before) { stepOp('download'); return pm.installBundle(p.spec, { enabled: false, requestId: requestId, approvedBuilds: approved }).then(unwrapRpc).then(function (res) { return { before: before, app: checkChange(res, T('mk.opInstall', { spec: p.spec })) } }) })
+          .then(function (ctx2) { stepOp('enable'); return enableNewBundles(ctx2.before).then(function (res) { return { failedEnables: res.failed, verMap: res.verMap, app: ctx2.app } }) })
+          .then(function (ctx3) { return refreshInstalled().then(function () { return ctx3 }) })
+          .then(function (ctx3) {
+            if (ctx3.failedEnables.length) finishOp('warn', T('mk.installedEnableFailed', { spec: p.spec, list: ctx3.failedEnables.join('；') }), null)
+            else {
+              // 0.9.28：横幅带实装版本（与 install 主链同款；grantedOk 文案附版本后缀）
+              var okVer = ''
+              var vm = ctx3.verMap || {}
+              for (var vk in vm) { if (vm[vk]) { okVer = vm[vk]; break } }
+              var restart1 = ctx3.app === 'restart-required'
+              var base = T(restart1 ? 'mk.grantedOkRestart' : 'mk.grantedOk', { spec: p.spec })
+              finishOp('ok', okVer ? base + '（v' + okVer + '）' : base, null)
+            }
+          })
+          .catch(function (e) { finishOp('fail', T('mk.installFailed') + friendlyManageError(e), { spec: p.spec, repoName: '' }) }) // 0.9.23：网络类天书换人话（与 install 主链同款）
+          .then(function () { setBusy(''); endOp(); pumpQueue() })
+      })
+    }, [pm, refreshInstalled, pendingBuilds, beginOp, stepOp, endOp, clearMsg, finishOp, runExclusiveOp, pumpQueue])
 
     // （matchCat 已外提至 40-market-helpers）
 
@@ -1493,6 +1561,8 @@ function createCommunitySection(ctx, form) {
         } else if (prog.line && !prog.exitCode) {
           nodes.push(jsx('div', { key: 'raw', className: 'dcards-counts', style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: prog.line, children: prog.line }))
         }
+        // 0.9.33：pnpm 操作进行中刷新页面会打断在飞 RPC（宿主中止并回滚 manifest，更新梯子场景停在孤儿态）——卡内明示
+        nodes.push(jsx('div', { key: 'nr', style: { marginTop: '2px', fontSize: '11px', color: 'var(--dsw-alias-label-tertiary)' }, children: T('mk.noRefreshTip') }))
         return nodes
       })() }) : null,
       // 0.9.6：操作结束 → 结果卡片（成功/部分/失败 + 用时 + 失败阶段 + 退出码 + 重试）；无结果数据时回退原 message banner
@@ -1566,7 +1636,7 @@ function createCommunitySection(ctx, form) {
               jsx('span', { key: 'sp', style: { flex: 1 } }),
               jsx('button', { key: 'en', style: Object.assign({}, BTN_GHOST_STYLE, { whiteSpace: 'nowrap', flexShrink: 0 }), disabled: busy !== '', title: b.enabled ? T('mk.disableTip') : T('mk.enableTip'), onClick: function () { toggleBundle(b.name, !b.enabled) }, children: opBusy ? '…' : (b.enabled ? T('mk.disableBtn') : T('mk.enableBtn')) }),
               // 0.8.17 只在有更新时显示更新按钮；已最新不占位（如需强制重装走卸载重装）
-              outdated ? jsx('button', { key: 'up', style: Object.assign({}, BTN_STYLE, { whiteSpace: 'nowrap', flexShrink: 0 }), disabled: busy !== '', title: T('mk.updateTip', { v: rtRec.v }), onClick: function () { updateBundle(b.name, null, rtRec.v) }, children: opBusy ? '…' : T('mk.updateTo', { v: rtRec.v }) }) : null,
+              outdated ? jsx('button', { key: 'up', style: Object.assign({}, BTN_STYLE, { whiteSpace: 'nowrap', flexShrink: 0 }), disabled: busy !== '', title: T('mk.updateTip', { v: rtRec.v }), onClick: function () { updateBundle(b.name, null, rtRec.v, b.version) }, children: opBusy ? '…' : T('mk.updateTo', { v: rtRec.v }) }) : null,
               jsx('button', { key: 'rm', style: confirmRemove === b.name ? Object.assign({}, BTN_STYLE, { background: 'var(--dsw-alias-state-error-primary)', borderColor: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'nowrap', flexShrink: 0 }) : Object.assign({}, BTN_GHOST_STYLE, { whiteSpace: 'nowrap', flexShrink: 0 }),
                 disabled: busy !== '' || b.removable === false,
                 title: b.removable === false ? T('mk.uninstallBlockedTip') : (confirmRemove === b.name ? T('mk.uninstallTip2') : T('mk.uninstallTip')),
@@ -1646,7 +1716,7 @@ function createCommunitySection(ctx, form) {
           : canUpdate ? jsx('button', {
             key: 'btn', style: busy === spec ? BTN_GHOST_STYLE : btnSolid, disabled: busy !== '',
             title: T('mk.updateCardTip', { cur: installedVer[instName] || '?', src: latestSrc, latest: latestVer }),
-            onClick: function () { updateBundle(instName, spec, latestVer) },
+            onClick: function () { updateBundle(instName, spec, latestVer, installedVer[instName]) },
             children: busy === spec ? T('mk.updating') : T('mk.hasUpdate'),
           })
           : notInstallable ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE,
