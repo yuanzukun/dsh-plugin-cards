@@ -735,7 +735,10 @@ function createCommunitySection(ctx, form) {
       activeOpCountRef.current = Math.max(0, activeOpCountRef.current - 1)
       setProg(null)
       // 0.9.33：排队中的整页刷新在此落地——最后一个操作收尾后再刷新，绝不打断在飞操作
-      if (pendingReloadRef.current && activeOpCountRef.current === 0) {
+      // 0.9.34：补队列护栏——安装成功也接入自动刷新后，pumpQueue 会在 endOp 之后同步启动下一个排队安装，
+      // 若此时落地 400ms 刷新定时器会打断下一梯的在飞 RPC（宿主中止并回滚 manifest）；队列非空则挂起，
+      // 由后续操作的 endOp 续检（pendingReloadRef 保持 true）
+      if (pendingReloadRef.current && activeOpCountRef.current === 0 && !(queueRef.current && queueRef.current.length)) {
         pendingReloadRef.current = false
         if (!pageReloadTimer) pageReloadTimer = setTimeout(function () { window.location.reload() }, 400)
       }
@@ -914,6 +917,9 @@ function createCommunitySection(ctx, form) {
             for (var vk in vm) { if (vm[vk]) { okVer = vm[vk]; break } }
             var restart0 = ctx3.app === 'restart-required'
             finishOp('ok', T(okVer ? (restart0 ? 'mk.installedOkRestartVer' : 'mk.installedOkVer') : (restart0 ? 'mk.installedOkRestart' : 'mk.installedOk'), { spec: spec, ver: okVer }), null)
+            // 0.9.34：安装成功后自动整页刷新（与更新/卸载同款机制，走 requestPageReload 统一入口）——
+            // 宿主已即时生效，仅剩浏览器端旧插件 JS 未换；restart-required 场景刷新无效，不接
+            if (!restart0) requestPageReload(1500)
           }
         })
         .catch(function (e) {
@@ -982,16 +988,22 @@ function createCommunitySection(ctx, form) {
           pumpTimerRef.current = setTimeout(function () { pumpTimerRef.current = null; pumpQueue() }, 1200)
         })
       })
-    }, [pm, refreshInstalled, beginOp, stepOp, endOp, clearMsg, finishOp, pumpQueue, runExclusiveOp])
+    }, [pm, refreshInstalled, beginOp, stepOp, endOp, clearMsg, finishOp, pumpQueue, runExclusiveOp, requestPageReload])
     installRef.current = install // 0.9.6：pumpQueue 经 ref 调最新 install（解循环引用）
 
     /** 宿主管理操作错误 → 面板友好文案（源码错误码：stop-profile / bundle-in-use / not-removable / management-required）。 */
     function friendlyManageError(e) {
       var m = String((e && e.message) || e)
-      // 0.9.23：网络类预检失败先行识别（此前英文天书直出——desktop/web 双端真机踩坑 2026-10-12）
       var netKey = classifyNetError(m)
       if (netKey === 'github') return T('mk.errNetGithub')
-      if (netKey === 'net') return T('mk.errNet')
+      if (netKey === 'net') return T('mk.errNet') // 0.9.23：网络类预检失败先行识别（此前英文天书直出——desktop/web 双端真机踩坑 2026-10-12）
+      // 0.9.34：ERR_PNPM_IGNORED_BUILDS 连坐归因——pnpm 11 下 profile 里任一依赖构建脚本未授权，所有安装/更新
+      // 都整体失败且报错指向该包（dsh-purge git 源实锤连坐 dsh-context/dshmarket 等一批插件）。提取罪魁包名 + 自救指引
+      if (m.indexOf('ERR_PNPM_IGNORED_BUILDS') !== -1) {
+        var ignPkg = (/Ignored build scripts: ([^\n]+)/.exec(m) || [])[1] || '?'
+        if (ignPkg.length > 90) ignPkg = ignPkg.slice(0, 90) + '…'
+        return T('mk.errIgnoredBuilds', { pkg: ignPkg }) + T('mk.errIgnoredBuildsFix')
+      }
       // 0.9.23：宿主 ChangeResult 的 kind 键（classifyInstallFailure 产物）直接命中网络类
       if (m === 'network' || m === 'timeout') return T('mk.errNet')
       if (m.indexOf('already-installed') !== -1) return T('mk.errAlreadyInstalled')
@@ -1234,12 +1246,14 @@ function createCommunitySection(ctx, form) {
               var restart1 = ctx3.app === 'restart-required'
               var base = T(restart1 ? 'mk.grantedOkRestart' : 'mk.grantedOk', { spec: p.spec })
               finishOp('ok', okVer ? base + '（v' + okVer + '）' : base, null)
+              // 0.9.34：授权构建成功同样自动整页刷新（与 install 主链同款；restart-required 不刷）
+              if (!restart1) requestPageReload(1500)
             }
           })
           .catch(function (e) { finishOp('fail', T('mk.installFailed') + friendlyManageError(e), { spec: p.spec, repoName: '' }) }) // 0.9.23：网络类天书换人话（与 install 主链同款）
           .then(function () { setBusy(''); endOp(); pumpQueue() })
       })
-    }, [pm, refreshInstalled, pendingBuilds, beginOp, stepOp, endOp, clearMsg, finishOp, runExclusiveOp, pumpQueue])
+    }, [pm, refreshInstalled, pendingBuilds, beginOp, stepOp, endOp, clearMsg, finishOp, runExclusiveOp, pumpQueue, requestPageReload])
 
     // （matchCat 已外提至 40-market-helpers）
 
@@ -1676,6 +1690,11 @@ function createCommunitySection(ctx, form) {
         // 0.8.5：实时校验命中时徽章直接显示 npm 最新版（未命中保持快照版本）——快照层 version 滞后不再误导
         var ver = rtRec && rtRec.v ? 'v' + rtRec.v : (typeof item.version === 'string' && item.version ? 'v' + item.version : null)
         var canUpdate = isInstalled && !!spec && !!latestVer && cmpVersion(latestVer, installedVer[instName]) > 0
+        // 0.9.34：git 源卡片「有更新」口径修正——git 安装的本地版本号永远是 git master 的 package.json 版本，
+        // 与 npm 快照/实时版本比较必然错位（dsh-purge 实锤：本地 1.1.90 vs 卡片 1.2.1 永远「有更新」，点更新重装
+        // 同 HEAD 版本号不变 → 无限循环，且重装不带构建授权 → IGNORED_BUILDS 失败 → 插件被卸）。git-only 卡
+        // 不再标「更新到 vX」，改中性「重装」钮；npm 源卡片维持原「有更新 → vX」（那是真更新）
+        var cardGitOnly = item.source === 'github' || !item.npm
         // 0.9.13：双行头部——短名为主、owner·更新时间为副；★ 上移头部右侧
         var slashIdx = repo.lastIndexOf('/')
         var shortName = slashIdx >= 0 ? repo.slice(slashIdx + 1) : (repo || item.name || '')
@@ -1715,9 +1734,9 @@ function createCommunitySection(ctx, form) {
         var btnEl = isInstalled && !canUpdate ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE, title: instHit.via === 'map' ? T('mk.installedViaMap', { name: instName }) : T('mk.installedTip'), children: T('mk.installedBadge') })
           : canUpdate ? jsx('button', {
             key: 'btn', style: busy === spec ? BTN_GHOST_STYLE : btnSolid, disabled: busy !== '',
-            title: T('mk.updateCardTip', { cur: installedVer[instName] || '?', src: latestSrc, latest: latestVer }),
+            title: cardGitOnly ? T('mk.reinstallGitTip') : T('mk.updateCardTip', { cur: installedVer[instName] || '?', src: latestSrc, latest: latestVer }),
             onClick: function () { updateBundle(instName, spec, latestVer, installedVer[instName]) },
-            children: busy === spec ? T('mk.updating') : T('mk.hasUpdate'),
+            children: busy === spec ? T('mk.updating') : (cardGitOnly ? T('mk.reinstallBtn') : T('mk.hasUpdate')),
           })
           : notInstallable ? jsx('span', { key: 'btn', style: BTN_DISABLED_STYLE,
             title: T('mk.notInstallableTip'), children: '🚫 ' + T('mk.notInstallable') })

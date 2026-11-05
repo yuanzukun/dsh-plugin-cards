@@ -142,6 +142,10 @@ var ZH = {
   'mk.installedBadge': '已安装',
   'mk.installedTip': '已安装（在「已安装」页管理：启用/停用/卸载）',
   'mk.updateCardTip': '已装 v{cur}，{src}最新 v{latest}；更新 = 按此卡片来源重装',
+  // 0.9.34：git 源卡片「有更新」口径修正——git 安装的本地版本号永远是 git master 的 package.json 版本，
+  // 与 npm/快照版本比较必然错位（dsh-purge 实锤：本地 1.1.90 vs 卡片 1.2.1 永远「有更新」死循环），改中性「重装」
+  'mk.reinstallBtn': '重装',
+  'mk.reinstallGitTip': 'git 源插件：本地版本号来自仓库 master 的 package.json，与 npm/快照版本比较可能永远错位——「重装」即按此卡片来源拉取最新代码，版本号可能不变',
   'mk.updating': '更新中…',
   'mk.notInstallable': '不可安装',
   'mk.notInstallableTip': '快筛未在 package.json 发现 dsh.bundle 声明（官方插件硬要求），安装会被宿主拒绝',
@@ -259,16 +263,17 @@ var ZH = {
   'mk.queueRemove': '从队列移除',
   'mk.queueContinue': '继续安装（{n}）',
   'mk.queuePaused': '队列已暂停（上个安装未成功完成）',
-  'mk.installedOk': '✅ 已安装并启用：{spec}（宿主已即时生效，刷新页面后新插件界面可见）',
+  // 0.9.34：安装成功接入自动整页刷新（与更新/卸载同款 requestPageReload 机制），文案同步改「即将自动刷新」
+  'mk.installedOk': '✅ 已安装并启用：{spec}（宿主已即时生效；页面即将自动刷新加载新插件界面）',
   'mk.installedOkRestart': '✅ 已安装并启用：{spec}（将在我下次启动 DeepSeek Harness 后加载；刷新页面不生效）',
   // 0.9.28：带实装版本（宿主 BundleInfo.version）——真机 E2E 实证市场卡版本（快照元数据）会滞后
   // 实装版本（git HEAD 安装实时最新），横幅带本地真实版本消除口径分裂
-  'mk.installedOkVer': '✅ 已安装并启用：{spec}（v{ver}；宿主已即时生效，刷新页面后新插件界面可见）',
+  'mk.installedOkVer': '✅ 已安装并启用：{spec}（v{ver}；宿主已即时生效；页面即将自动刷新加载新插件界面）',
   'mk.installedOkRestartVer': '✅ 已安装并启用：{spec}（v{ver}；将在我下次启动 DeepSeek Harness 后加载；刷新页面不生效）',
   'mk.installedEnableFailed': '⚠️ 已安装：{spec}，但启用失败：{list}（可在「已安装」区块重试启用）',
   'mk.buildBlocked': '⚠️ 安装被 pnpm 构建授权拦下（插件带 prepare 构建脚本）：点下方「授权构建并重试」继续。',
   'mk.installFailed': '❌ 安装失败：',
-  'mk.grantedOk': '✅ 已授权构建并安装：{spec}（宿主已即时生效，刷新页面后新插件界面可见）',
+  'mk.grantedOk': '✅ 已授权构建并安装：{spec}（宿主已即时生效；页面即将自动刷新加载新插件界面）',
   'mk.grantedOkRestart': '✅ 已授权构建并安装：{spec}（将在我下次启动 DeepSeek Harness 后加载；刷新页面不生效）',
   'mk.enabledOk': '✅ 已启用：{name}（已即时生效）',
   'mk.enabledOkRestart': '✅ 已启用：{name}（将在下次启动 DeepSeek Harness 后加载）',
@@ -324,6 +329,10 @@ var ZH = {
   // 「装完刚发布的版本再卸载/更新」必踩；给原因 + 可执行自救，替代天书报错
   'mk.errMinAge': 'pnpm 11 供应链保护拦截：{pkg} 发布不足 24 小时，卸载/更新时会重校验整个 lockfile（该检查不受 exclude 豁免）。',
   'mk.errMinAgeFix': '自救：在 ~/.dsh/profiles/<当前profile>/pnpm-workspace.yaml 里加一行 minimumReleaseAge: 0 后重试；或手动执行 pnpm remove <包名> --config.minimum-release-age=0',
+  // 0.9.34：ERR_PNPM_IGNORED_BUILDS 连坐归因——报错对象是 profile 里「已有依赖」的未授权构建脚本，不是本次目标插件
+  // （2026-11-05 桌面端日志实证：dsh-purge git 源未授权期间连坐 dsh-context/dshmarket/dsh-plugin-cards 等全部插件安装与更新）
+  'mk.errIgnoredBuilds': '⚠️ 本次操作被 pnpm 构建授权「连坐」拦截：profile 里已有依赖 {pkg} 的构建脚本未获授权，pnpm 11 会让每次安装/更新整体失败（报错的是它，不是本次操作的插件）。',
+  'mk.errIgnoredBuildsFix': '自救：到「自定义安装」用 npm 源重装该包完成构建授权（git 源重装无效），或临时卸载它后再回来重试本操作。',
   'mk.fullLog': '（完整日志：~/.dsh/profiles/<profile>/.plugin-manager/logs/）',
   'mk.buildsInvolved': '；涉及构建：',
   'mk.andMore': ' 等 {n} 个',
